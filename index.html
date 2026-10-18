@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>知識辞書</title>
+<meta name="description" content="AIに聞いたことを、キーワード1つで引き出す個人用の知識辞書">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="知識辞書">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--text:#1c1c1e;--sub:#6b7280;--line:#dcdfe4;--accent:#2f6fed;--accent-ink:#fff;--unk:#d9382f;--lrn:#b86e00;--knw:#1a8a4a;--mark:#fff1a8;--warn:#fff6e0;--warn-line:#f0c36a}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--text:#ececf1;--sub:#9aa3b2;--line:#2a2f38;--accent:#6ea0ff;--accent-ink:#0b1020;--unk:#ff6b61;--lrn:#ffb340;--knw:#4cd68a;--mark:#5a4b00;--warn:#2b2410;--warn-line:#6b5420}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Segoe UI",sans-serif;line-height:1.6}
+body{min-height:100vh}
+button{font:inherit;color:inherit;cursor:pointer}
+input,textarea,select{font:inherit;font-size:16px;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+textarea{resize:vertical}
+mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
+a{color:var(--accent)}
+#app{max-width:720px;margin:0 auto;padding:0 14px calc(env(safe-area-inset-bottom, 0px) + 96px)}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);padding:calc(env(safe-area-inset-top, 0px) + 10px) 0 8px}
+.top-row{display:flex;align-items:center;gap:8px}
+.title{font-size:20px;font-weight:800;flex:1}
+.icon-btn{border:1px solid var(--line);background:var(--card);border-radius:12px;min-width:44px;min-height:44px;font-size:18px}
+.search{position:relative;margin-top:8px}
+.search input{padding-left:40px;min-height:48px;font-size:17px;border-radius:14px}
+.search .mag{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:17px;pointer-events:none}
+.search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:18px;min-width:40px;min-height:40px;color:var(--sub);display:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.fchip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:14px;min-height:36px}
+.fchip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.count{font-size:13px;color:var(--sub);margin:10px 2px 2px}
+.banner{background:var(--warn);border:1px solid var(--warn-line);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin:10px 0;cursor:pointer}
+.c-top{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
+.c-term{font-size:18px;font-weight:800;word-break:break-word}
+.badge{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;border:1px solid currentColor;white-space:nowrap;flex:none}
+.und-unknown{color:var(--unk)}.und-learning{color:var(--lrn)}.und-known{color:var(--knw)}
+.c-one{font-size:15px;margin-top:3px;color:var(--text)}
+.c-tags{margin-top:6px}
+.tag{display:inline-block;font-size:12px;color:var(--sub);background:transparent;border:1px solid var(--line);border-radius:999px;padding:1px 9px;margin:2px 4px 2px 0}
+.c-meta{font-size:12px;color:var(--sub);margin-top:6px}
+.empty{text-align:center;color:var(--sub);padding:40px 12px}
+.empty .btns{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:10px 14px calc(env(safe-area-inset-bottom, 0px) + 10px);background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.bar-in{max-width:720px;margin:0 auto}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 14px;min-height:44px;font-weight:700}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.wide{width:100%}
+.btn.danger{color:var(--unk)}
+.btn.sm{min-height:38px;padding:7px 12px;font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>.btn{flex:1}
+.sheet{position:fixed;inset:0;z-index:50;background:var(--bg);overflow-y:auto;transform:translateY(100%);visibility:hidden;transition:transform .22s ease,visibility 0s .22s;-webkit-overflow-scrolling:touch}
+.sheet.open{transform:none;visibility:visible;transition:transform .22s ease}
+.sh-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px;background:var(--bg);border-bottom:1px solid var(--line)}
+.sh-head h2{flex:1;margin:0;font-size:17px;text-align:center}
+.sh-head button{border:0;background:transparent;color:var(--accent);font-weight:700;min-height:44px;min-width:56px;font-size:16px}
+.sh-body{max-width:720px;margin:0 auto;padding:12px 14px calc(env(safe-area-inset-bottom, 0px) + 40px)}
+.lab{display:block;font-size:13px;color:var(--sub);margin:14px 0 4px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0}
+.box .lab{margin-top:0}
+.note{font-size:12px;color:var(--sub);line-height:1.6;margin-top:4px}
+.v-term{font-size:24px;font-weight:800;line-height:1.35;word-break:break-word}
+.und-row{display:flex;gap:6px;margin:10px 0}
+.und-row button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;min-height:44px;font-weight:700}
+.und-row button.on.und-unknown{background:var(--unk);color:#fff;border-color:var(--unk)}
+.und-row button.on.und-learning{background:var(--lrn);color:#fff;border-color:var(--lrn)}
+.und-row button.on.und-known{background:var(--knw);color:#fff;border-color:var(--knw)}
+.und-row button.on.und-learning{color:#1a1200}
+.tagbtn{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 12px;margin:3px 4px 3px 0;font-size:14px;min-height:34px}
+.tagbtn.has{border-color:var(--accent);color:var(--accent)}
+details.qa{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:10px 0;padding:0 12px}
+details.qa summary{padding:12px 0;font-weight:700;cursor:pointer;list-style:none}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa .qa-body{padding:0 0 12px}
+.qa-meta{font-size:12px;color:var(--sub);font-weight:400}
+.sec-h{font-size:13px;color:var(--sub);margin:12px 0 2px}
+.sim{background:var(--warn);border:1px solid var(--warn-line);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px}
+.sim .it{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--warn-line)}
+.sim .it .btn{white-space:nowrap}
+.sim .it:first-of-type{border-top:0}
+.cand{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--card)}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom, 0px) + 84px);transform:translateX(-50%);background:#222;color:#fff;border-radius:12px;padding:10px 16px;font-size:14px;z-index:90;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:.96}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="top-row">
+      <div class="title">📖 知識辞書</div>
+      <button class="icon-btn" id="btnSettings" aria-label="設定とバックアップ">⚙︎</button>
+    </div>
+    <div class="search">
+      <span class="mag">🔎</span>
+      <input type="search" id="q" placeholder="何が分からない？ キーワードを入れる（空白で絞り込み）" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
+      <button class="clr" id="btnClear" aria-label="消す">✕</button>
+    </div>
+    <div class="chips" id="fchips">
+      <button class="fchip on" data-f="all">すべて</button>
+      <button class="fchip" data-f="unknown">未理解</button>
+      <button class="fchip" data-f="learning">理解中</button>
+      <button class="fchip" data-f="known">理解済</button>
+    </div>
+  </div>
+  <div id="warnBox"></div>
+  <div class="count" id="count"></div>
+  <div id="list"></div>
+</div>
+
+<div class="bar"><div class="bar-in"><button class="btn pri wide" id="btnAdd">＋ Q&amp;Aを足す</button></div></div>
+
+<!-- 項目（辞書カード）：読む画面 -->
+<div class="sheet" id="shEntry">
+  <div class="sh-head"><button id="enClose">閉じる</button><h2>項目</h2><button id="enEdit">編集</button></div>
+  <div class="sh-body" id="enBody"></div>
+</div>
+
+<!-- 項目の編集 -->
+<div class="sheet" id="shEntryEdit">
+  <div class="sh-head"><button id="eeCancel">キャンセル</button><h2>項目を編集</h2><button id="eeSave">保存</button></div>
+  <div class="sh-body">
+    <label class="lab" for="eeTerm">見出し語</label><input id="eeTerm" maxlength="60">
+    <label class="lab" for="eeOne">一言説明</label><input id="eeOne" maxlength="120" placeholder="例：APIの認証に使うトークン形式">
+    <label class="lab" for="eeTags">タグ（カンマか空白で区切る）</label><input id="eeTags" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="lab" for="eeRel">関連用語（カンマか空白で区切る）</label><input id="eeRel" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="lab" for="eeNote">自分の理解（AIの回答とは別に、自分の言葉で）</label><textarea id="eeNote" rows="5"></textarea>
+    <div class="box" style="margin-top:18px"><button class="btn danger wide" id="eeDelete">この項目を削除（Q&amp;Aも消えます）</button></div>
+  </div>
+</div>
+
+<!-- Q&A を足す／直す -->
+<div class="sheet" id="shQA">
+  <div class="sh-head"><button id="qaCancel">キャンセル</button><h2 id="qaTitle">Q&amp;Aを足す</h2><button id="qaSave">保存</button></div>
+  <div class="sh-body">
+    <div class="note">AIに聞いた「質問」と「回答」を貼り付けます。同じ見出し語のQ&amp;Aは、1つの項目にまとまります。</div>
+    <label class="lab" for="qQuestion" style="display:flex;justify-content:space-between;align-items:center">質問 <button class="btn sm" type="button" data-paste="qQuestion">📋 貼り付け</button></label>
+    <textarea id="qQuestion" rows="3" placeholder="AIに聞いたこと"></textarea>
+    <div id="simBox"></div>
+    <label class="lab" for="qAnswer" style="display:flex;justify-content:space-between;align-items:center">回答 <button class="btn sm" type="button" data-paste="qAnswer">📋 貼り付け</button></label>
+    <textarea id="qAnswer" rows="7" placeholder="AIの回答"></textarea>
+
+    <button class="btn wide" id="btnAI" style="margin-top:14px">✨ AI整理（候補を出す）</button>
+    <div class="note">押すと、質問と回答をAIに送ります（秘密らしい行は除きます。「自分の判断」は送りません）。結果は候補で、採用を押すまで入りません。</div>
+    <div id="aiBox"></div>
+
+    <label class="lab" for="qTerm">見出し語（辞書の見出しになる語。空なら質問の1行目）</label>
+    <input id="qTerm" maxlength="60" list="termList" placeholder="例：JWT" autocomplete="off">
+    <datalist id="termList"></datalist>
+    <div class="note" id="termNote"></div>
+    <label class="lab" for="qOne">一言説明</label><input id="qOne" maxlength="120" placeholder="例：APIの認証に使うトークン形式">
+    <label class="lab" for="qJudgment">自分の判断（任意。AIの回答とは別に残す）</label>
+    <textarea id="qJudgment" rows="3" placeholder="例：今回はZustandにする。理由：規模が小さいため"></textarea>
+    <label class="lab" for="qTags">タグ（カンマか空白で区切る）</label><input id="qTags" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="例：認証 API Web">
+    <label class="lab" for="qRel">関連用語（カンマか空白で区切る）</label><input id="qRel" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="例：OAuth Cookie">
+    <label class="lab" for="qSource">ソース</label>
+    <select id="qSource"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="gemini">Gemini</option><option value="perplexity">Perplexity</option><option value="cursor">Cursor</option><option value="manual">手入力</option><option value="other">その他</option></select>
+    <label class="lab" for="qUrl">ソースURL（任意）</label><input id="qUrl" type="url" placeholder="https://..." autocapitalize="none" autocorrect="off" spellcheck="false">
+    <div class="note">タグと関連用語は、保存すると項目に「足されます」。消したいときは、項目の「編集」から。</div>
+  </div>
+</div>
+
+<!-- 設定・バックアップ -->
+<div class="sheet" id="shSet">
+  <div class="sh-head"><button id="stClose">閉じる</button><h2>設定・バックアップ</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <div class="box">
+      <div class="lab">データ</div>
+      <div id="stStat" style="font-size:15px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="btnExport">📤 書き出す（バックアップ）</button>
+        <button class="btn" id="btnImportOwn">📥 読み込む</button>
+      </div>
+      <div class="note">データは、この端末のこのアプリの中にだけ保存されます。消えないよう、ときどき「書き出す」でバックアップしてください（ファイルアプリやiCloud Driveに保存）。</div>
+    </div>
+    <div class="box">
+      <div class="lab">quick-ref から取り込む</div>
+      <button class="btn wide" id="btnImportQR">📥 quick-ref の書き出しJSONを選ぶ</button>
+      <div class="note">quick-ref の「JSONエクスポート」で作ったファイルを選びます。「AI Q&amp;A」のメモだけを取り込みます（保護メモ・ふつうのメモは取り込みません）。同じファイルを何度選んでも、重複しません。</div>
+    </div>
+    <div class="box">
+      <div class="lab">AI整理の接続（任意）</div>
+      <label class="lab" for="sEndpoint">エンドポイント（quick-ref の同期設定と同じ）</label>
+      <input id="sEndpoint" type="url" placeholder="https://..." autocapitalize="none" autocorrect="off" spellcheck="false">
+      <label class="lab" for="sToken">同期トークン</label>
+      <input id="sToken" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="空欄なら変更しません">
+      <label class="lab" for="sProvider">AI</label>
+      <select id="sProvider"><option value="gemini">Gemini（おすすめ）</option><option value="openai">OpenAI</option><option value="claude">Claude</option></select>
+      <label class="lab" for="sModel">モデル名（空なら標準）</label>
+      <input id="sModel" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="例：gemini-3.5-flash-lite">
+      <div class="row" style="margin-top:10px"><button class="btn pri" id="btnSaveAI">保存</button><button class="btn" id="btnTestAI">接続テスト</button></div>
+      <div class="note" id="aiStat"></div>
+    </div>
+    <div class="box">
+      <div class="lab">このアプリについて</div>
+      <div class="note" style="font-size:13px">知識辞書 v<span id="ver"></span>　／　保存先：この端末のIndexedDB<br>保護（暗号化）には未対応です。秘密が混ざる回答は貼らないでください。</div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileOwn" accept="application/json,.json" class="hidden">
+<input type="file" id="fileQR" accept="application/json,.json" class="hidden">
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+const APP_VERSION = '0.1.0';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const escBr = s => esc(s).replace(/\n/g, '<br>');
+const norm = s => String(s == null ? '' : s).normalize('NFKC').toLowerCase().trim();
+const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+const lsGet = k => { try { return localStorage.getItem(k) || ''; } catch (_) { return ''; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+const firstLine = s => String(s || '').split('\n').map(x => x.trim()).find(Boolean) || '';
+const dstr = ms => ms ? new Date(ms).toLocaleDateString('ja-JP') : '';
+const UND = { unknown: '未理解', learning: '理解中', known: '理解済' };
+const SRC = { chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini', perplexity: 'Perplexity', cursor: 'Cursor', manual: '手入力', other: 'その他' };
+
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ───────── 保存（IndexedDB。使えない環境ではメモリのみ） ───────── */
+let db = null, memOnly = false;
+function openDB() {
+  return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error('IndexedDBが使えません'));
+    const r = indexedDB.open('knowledge-dictionary', 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('entries', { keyPath: 'id' });
+      d.createObjectStore('qas', { keyPath: 'id' }).createIndex('entryId', 'entryId');
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error || new Error('開けません'));
+    r.onblocked = () => rej(new Error('他の画面が使用中です'));
+  });
+}
+const idbAll = store => new Promise((res, rej) => { const q = db.transaction(store).objectStore(store).getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+const idbPutMany = (store, list) => new Promise((res, rej) => {
+  if (!db || !list.length) return res();
+  const t = db.transaction(store, 'readwrite'), s = t.objectStore(store);
+  list.forEach(x => s.put(x));
+  t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+});
+const idbDel = (store, ids) => new Promise((res, rej) => {
+  if (!db || !ids.length) return res();
+  const t = db.transaction(store, 'readwrite'), s = t.objectStore(store);
+  ids.forEach(id => s.delete(id));
+  t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+});
+
+/* ───────── 状態 ───────── */
+let entries = [], qas = [];
+let entryById = new Map(), qaById = new Map(), qasByEntry = new Map();
+let searchQuery = '', filterUnd = 'all';
+const idxCache = new Map();
+function rebuild() {
+  entryById = new Map(entries.map(e => [e.id, e]));
+  qaById = new Map(qas.map(q => [q.id, q]));
+  qasByEntry = new Map();
+  qas.forEach(q => { if (!qasByEntry.has(q.entryId)) qasByEntry.set(q.entryId, []); qasByEntry.get(q.entryId).push(q); });
+  for (const a of qasByEntry.values()) a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+  idxCache.clear();
+}
+async function writeEntries(list) {
+  list.forEach(e => { const i = entries.findIndex(x => x.id === e.id); if (i >= 0) entries[i] = e; else entries.push(e); });
+  rebuild(); await idbPutMany('entries', list); afterWrite();
+}
+async function writeQAs(list) {
+  list.forEach(q => { const i = qas.findIndex(x => x.id === q.id); if (i >= 0) qas[i] = q; else qas.push(q); });
+  rebuild(); await idbPutMany('qas', list); afterWrite();
+}
+let persistAsked = false;
+function afterWrite() {
+  if (!persistAsked && navigator.storage && navigator.storage.persist) { persistAsked = true; navigator.storage.persist().catch(() => {}); }
+}
+const findEntryByTerm = term => { const n = norm(term); return n ? entries.find(e => norm(e.term) === n) : null; };
+const splitList = s => [...new Set(String(s || '').split(/[,、，\s#＃]+/).map(x => x.trim().slice(0, 30)).filter(Boolean))].slice(0, 12);
+const union = (a, b) => { const seen = new Set(), out = []; for (const x of [].concat(a || [], b || [])) { const k = norm(x); if (k && !seen.has(k)) { seen.add(k); out.push(x); } } return out; };
+
+/* ───────── 検索 ───────── */
+function bigramSet(s) {
+  const t = String(s).replace(/\s+/g, ''), r = new Set();
+  for (let i = 0; i < t.length - 1; i++) r.add(t.slice(i, i + 2));
+  if (t.length === 1) r.add(t);
+  return r;
+}
+function idxOf(e) {
+  let x = idxCache.get(e.id); if (x) return x;
+  const qs = qasByEntry.get(e.id) || [];
+  const qa = qs.map(q => norm([q.question, q.answer, q.judgment].join(' ')));
+  x = { term: norm(e.term), one: norm(e.oneLine), tags: (e.tags || []).map(norm), rel: (e.related || []).map(norm), note: norm(e.note), qa, qaQ: qs.map(q => norm(q.question)), all: '', bi: null };
+  x.all = [x.term, x.one, x.tags.join(' '), x.rel.join(' '), x.note, qa.join(' ')].join(' ');
+  idxCache.set(e.id, x); return x;
+}
+const tokensOf = q => norm(q).split(/\s+/).filter(Boolean);
+// 空白で区切った語は、すべて含むものだけ（AND）。見出し語・タグに当たるほど上に出る
+function scoreEntry(e, toks) {
+  const x = idxOf(e); let total = 0;
+  for (const q of toks) {
+    let s = 0;
+    if (x.term === q) s = 100;
+    else if (x.tags.includes(q)) s = 80;
+    else if (x.term.includes(q)) s = 50;
+    else if (x.tags.some(t => t.includes(q))) s = 30;
+    else if (x.one.includes(q)) s = 20;
+    else if (x.rel.some(t => t.includes(q))) s = 15;
+    else if (x.note.includes(q)) s = 8;
+    else if (x.qa.some(t => t.includes(q))) s = 5;
+    else if (q.length >= 3) {   // 2文字ずつの曖昧一致（3文字以上の語だけ）
+      x.bi = x.bi || bigramSet(x.all);
+      const qb = bigramSet(q); let m = 0;
+      for (const b of qb) if (x.bi.has(b)) m++;
+      if (m / qb.size >= 0.67) s = 0.5;
+    }
+    if (!s) return 0;
+    total += s;
+  }
+  return total;
+}
+function searchEntries(query, und) {
+  const toks = tokensOf(query);
+  let list = entries.filter(e => und === 'all' || (e.understanding || 'unknown') === und);
+  if (!toks.length) return list.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return list.map(e => ({ e, s: scoreEntry(e, toks) })).filter(x => x.s > 0)
+    .sort((a, b) => (b.s - a.s) || ((b.e.updatedAt || 0) - (a.e.updatedAt || 0))).map(x => x.e);
+}
+function hl(text, toks) {
+  const safe = esc(text);
+  if (!toks.length) return safe;
+  const parts = toks.map(esc).sort((a, b) => b.length - a.length).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return safe.replace(new RegExp(parts.join('|'), 'gi'), m => '<mark>' + m + '</mark>');
+}
+function snippetFor(e, toks) {
+  const x = idxOf(e);
+  if (toks.length && !toks.some(q => x.term.includes(q) || x.tags.some(t => t.includes(q)) || x.one.includes(q))) {
+    for (const q of qasByEntry.get(e.id) || []) {
+      for (const f of [q.question, q.answer, q.judgment]) {
+        const t = String(f || ''), i = t.toLowerCase().indexOf(toks[0]);
+        if (i >= 0) return '💬 ' + t.slice(Math.max(0, i - 18), i + 60).replace(/\s+/g, ' ');
+      }
+    }
+  }
+  if (e.oneLine) return '📝 ' + e.oneLine;
+  const q0 = (qasByEntry.get(e.id) || [])[0];
+  return q0 ? '💬 ' + firstLine(q0.question).slice(0, 80) : '';
+}
+
+/* ───────── 一覧 ───────── */
+function renderList() {
+  const toks = tokensOf(searchQuery);
+  const list = searchEntries(searchQuery, filterUnd);
+  $('btnClear').style.display = searchQuery ? 'block' : 'none';
+  $('count').textContent = entries.length ? (toks.length || filterUnd !== 'all' ? list.length + '件ヒット（全' + entries.length + '項目）' : entries.length + '項目') : '';
+  const box = $('list');
+  if (!entries.length) {
+    box.innerHTML = '<div class="empty"><div style="font-size:40px">📖</div><div style="font-weight:700;margin-top:6px">まだ何もありません</div><div style="margin-top:6px;font-size:14px">AIに聞いたことを貼り付けて残すと、<br>あとからキーワード1つで引き出せます。</div><div class="btns"><button class="btn pri" data-act="add">＋ Q&amp;Aを足す</button><button class="btn" data-act="settings">quick-ref から取り込む</button></div></div>';
+    return;
+  }
+  if (!list.length) { box.innerHTML = '<div class="empty">見つかりませんでした。<br><span style="font-size:13px">語を減らすか、別の言い方で試してください。</span></div>'; return; }
+  box.innerHTML = list.map(e => {
+    const n = (qasByEntry.get(e.id) || []).length, u = e.understanding || 'unknown';
+    const tags = (e.tags || []).map(t => '<span class="tag">#' + hl(t, toks) + '</span>').join('');
+    const sn = snippetFor(e, toks);
+    return '<div class="card" data-open="' + esc(e.id) + '"><div class="c-top"><span class="c-term">' + hl(e.term, toks) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' +
+      (sn ? '<div class="c-one">' + hl(sn, toks) + '</div>' : '') + (tags ? '<div class="c-tags">' + tags + '</div>' : '') +
+      '<div class="c-meta">Q&amp;A ' + n + '件 · ' + dstr(e.updatedAt) + '</div></div>';
+  }).join('');
+}
+function renderWarn() {
+  const last = Number(lsGet('kd_last_backup')) || 0, days = last ? Math.floor((Date.now() - last) / 86400000) : null;
+  let h = '';
+  if (memOnly) h += '<div class="banner">⚠️ この環境では保存できません（プライベートブラウズなど）。閉じると消えます。</div>';
+  else if (qas.length >= 3 && (days === null || days >= 7)) h += '<div class="banner">💾 ' + (days === null ? 'まだバックアップがありません（Q&Aが3件以上たまったので）。' : days + '日バックアップしていません。') + ' <button class="btn sm" data-act="settings" style="margin-left:6px">⚙︎ 書き出す</button></div>';
+  $('warnBox').innerHTML = h;
+}
+function refresh() { renderList(); renderWarn(); renderTermList(); }
+function renderTermList() { $('termList').innerHTML = entries.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 200).map(e => '<option value="' + esc(e.term) + '">').join(''); }
+
+/* ───────── シート ───────── */
+function openSheet(id) { $(id).classList.add('open'); $(id).scrollTop = 0; document.body.style.overflow = 'hidden'; }
+function closeSheet(id) { $(id).classList.remove('open'); if (!document.querySelector('.sheet.open')) document.body.style.overflow = ''; }
+
+/* ───────── 項目（読む画面） ───────── */
+let viewId = null;
+function qaAskText(e, q) {
+  return '以前、AIとこんなやり取りをしました。これを踏まえて、続きを質問します。\n\n【項目】' + e.term + (e.oneLine ? '（' + e.oneLine + '）' : '') +
+    '\n\n【以前の質問】\n' + q.question + '\n\n【以前の回答】\n' + String(q.answer || '').slice(0, 1800) +
+    (q.judgment ? '\n\n【自分の判断】\n' + q.judgment : '') + (e.note ? '\n\n【自分の理解】\n' + e.note : '') + '\n\n【今回の質問】\n';
+}
+function openEntry(id) {
+  const e = entryById.get(id); if (!e) return;
+  viewId = id;
+  const u = e.understanding || 'unknown', qs = qasByEntry.get(id) || [];
+  const mine = new Set((e.tags || []).map(norm));
+  const rel = entries.filter(o => o.id !== id).map(o => ({ o, n: (o.tags || []).filter(t => mine.has(norm(t))).length })).filter(x => x.n > 0)
+    .sort((a, b) => (b.n - a.n) || ((b.o.updatedAt || 0) - (a.o.updatedAt || 0))).slice(0, 5);
+  let h = '<div class="v-term">' + esc(e.term) + '</div>';
+  if (e.oneLine) h += '<div style="font-size:17px;margin-top:4px">' + esc(e.oneLine) + '</div>';
+  h += '<div class="und-row">' + ['unknown', 'learning', 'known'].map(k => '<button class="und-' + k + (u === k ? ' on' : '') + '" data-und="' + k + '">' + UND[k] + '</button>').join('') + '</div>';
+  if (e.checkedAt) h += '<div class="note" style="margin-top:-4px">理解度を確認した日：' + dstr(e.checkedAt) + '</div>';
+  if ((e.tags || []).length) h += '<div style="margin:8px 0">' + e.tags.map(t => '<button class="tagbtn" data-search="' + esc(t) + '">#' + esc(t) + '</button>').join('') + '</div>';
+  if ((e.related || []).length) h += '<div class="sec-h">関連用語</div><div>' + e.related.map(t => '<button class="tagbtn' + (findEntryByTerm(t) ? ' has' : '') + '" data-rel="' + esc(t) + '">' + (findEntryByTerm(t) ? '📖 ' : '') + esc(t) + '</button>').join('') + '</div><div class="note">📖 付きは、辞書に項目があります。</div>';
+  if (e.note) h += '<div class="box" style="border-color:var(--accent)"><div class="lab">自分の理解</div><div>' + escBr(e.note) + '</div></div>';
+  h += '<div class="sec-h" style="margin-top:18px">Q&amp;A（' + qs.length + '件）</div>';
+  h += qs.map((q, i) => {
+    return '<details class="qa"' + (qs.length === 1 ? ' open' : '') + '><summary>' + esc(firstLine(q.question).slice(0, 80) || '(無題)') + '<div class="qa-meta">' + esc(SRC[q.sourceType] || 'その他') + ' · ' + dstr(q.createdAt) + '</div></summary><div class="qa-body">' +
+      '<div class="lab" style="margin-top:0">質問</div><div>' + escBr(q.question) + '</div>' +
+      '<div class="lab">AIの回答</div><div>' + escBr(q.answer) + '</div>' +
+      (q.judgment ? '<div class="lab">自分の判断</div><div style="border-left:3px solid var(--accent);padding-left:10px">' + escBr(q.judgment) + '</div>' : '') +
+      (q.sourceUrl && /^https?:\/\//i.test(q.sourceUrl) ? '<div style="margin-top:8px"><a href="' + esc(q.sourceUrl) + '" target="_blank" rel="noopener noreferrer">🔗 元の会話を開く</a></div>' : '') +
+      '<div class="row" style="margin-top:10px"><button class="btn sm" data-copy="a" data-qa="' + esc(q.id) + '">📋 回答をコピー</button><button class="btn sm" data-copy="ask" data-qa="' + esc(q.id) + '">📋 再質問用にコピー</button></div>' +
+      '<div class="row" style="margin-top:8px"><button class="btn sm" data-qaedit="' + esc(q.id) + '">編集</button><button class="btn sm danger" data-qadel="' + esc(q.id) + '">削除</button></div></div></details>';
+  }).join('');
+  h += '<button class="btn wide" data-addto="' + esc(id) + '" style="margin-top:8px">＋ この項目にQ&amp;Aを足す</button>';
+  h += '<div class="note">「再質問用にコピー」は、この項目の質問・回答・自分の判断・自分の理解をまとめて、AIに続きを聞くための文をコピーします。</div>';
+  if (rel.length) h += '<div class="sec-h" style="margin-top:18px">関連する項目（同じタグ）</div>' + rel.map(x => '<div class="card" data-open="' + esc(x.o.id) + '" style="margin:6px 0"><span class="c-term" style="font-size:16px">' + esc(x.o.term) + '</span>' + (x.o.oneLine ? '<div class="c-one">' + esc(x.o.oneLine) + '</div>' : '') + '</div>').join('');
+  $('enBody').innerHTML = h;
+  openSheet('shEntry');
+}
+async function copyText(txt, okMsg) {
+  try { await navigator.clipboard.writeText(txt); toast(okMsg); } catch (_) { toast('コピーできませんでした'); }
+}
+async function setUnderstanding(k) {
+  const e = entryById.get(viewId); if (!e) return;
+  await writeEntries([Object.assign({}, e, { understanding: k, checkedAt: Date.now(), updatedAt: Date.now() })]);
+  openEntry(viewId); refresh();
+}
+
+/* ───────── 項目の編集 ───────── */
+function openEntryEdit() {
+  const e = entryById.get(viewId); if (!e) return;
+  $('eeTerm').value = e.term; $('eeOne').value = e.oneLine || ''; $('eeTags').value = (e.tags || []).join(' ');
+  $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || '';
+  openSheet('shEntryEdit');
+}
+async function saveEntryEdit() {
+  const e = entryById.get(viewId); if (!e) return;
+  const term = $('eeTerm').value.trim(); if (!term) { toast('見出し語を入れてください'); return; }
+  const other = findEntryByTerm(term);
+  if (other && other.id !== e.id) { toast('同じ見出し語の項目があります。名前を変えてください'); return; }
+  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), note: $('eeNote').value.trim(), updatedAt: Date.now() })]);
+  closeSheet('shEntryEdit'); openEntry(viewId); refresh(); toast('保存しました');
+}
+async function deleteEntry() {
+  const e = entryById.get(viewId); if (!e) return;
+  const ids = (qasByEntry.get(e.id) || []).map(q => q.id);
+  if (!confirm('「' + e.term + '」と、Q&A ' + ids.length + '件を削除します。元に戻せません。よろしいですか？')) return;
+  entries = entries.filter(x => x.id !== e.id); qas = qas.filter(q => q.entryId !== e.id); rebuild();
+  await idbDel('entries', [e.id]); await idbDel('qas', ids);
+  closeSheet('shEntryEdit'); closeSheet('shEntry'); viewId = null; refresh(); toast('削除しました');
+}
+
+/* ───────── Q&A を足す／直す ───────── */
+let editingQA = null, aiCand = null, aiRun = 0;
+function clearQAForm() {
+  ['qQuestion', 'qAnswer', 'qTerm', 'qOne', 'qJudgment', 'qTags', 'qRel', 'qUrl'].forEach(id => { $(id).value = ''; });
+  $('qSource').value = lsGet('kd_last_source') || 'chatgpt';
+  $('simBox').innerHTML = ''; $('aiBox').innerHTML = ''; $('termNote').textContent = ''; aiCand = null; aiRun++;
+  $('btnAI').disabled = false; $('btnAI').textContent = '✨ AI整理（候補を出す）';
+}
+function openQAForm(opts) {
+  opts = opts || {}; clearQAForm(); editingQA = null;
+  $('qaTitle').textContent = 'Q&Aを足す';
+  if (opts.qaId) {
+    const q = qaById.get(opts.qaId), e = q && entryById.get(q.entryId); if (!q || !e) return;
+    editingQA = q.id; $('qaTitle').textContent = 'Q&Aを直す';
+    $('qQuestion').value = q.question; $('qAnswer').value = q.answer; $('qJudgment').value = q.judgment || '';
+    $('qSource').value = q.sourceType || 'other'; $('qUrl').value = q.sourceUrl || '';
+    $('qTerm').value = e.term; $('qOne').value = e.oneLine || ''; $('qTags').value = (e.tags || []).join(' '); $('qRel').value = (e.related || []).join(' ');
+  } else if (opts.term) { $('qTerm').value = opts.term; onTermChange(); }
+  updateTermNote(); openSheet('shQA');
+}
+function updateTermNote() {
+  const t = $('qTerm').value.trim(), e = findEntryByTerm(t), n = $('termNote');
+  if (!t) { n.textContent = ''; return; }
+  n.textContent = e ? '📖 既存の項目「' + e.term + '」に足されます（いまQ&A ' + (qasByEntry.get(e.id) || []).length + '件）。' : '🆕 新しい項目として作られます。';
+}
+function onTermChange() {
+  const e = findEntryByTerm($('qTerm').value);
+  if (e && !editingQA) {   // 既存の項目に合わせたとき、空欄だけ、その項目の値で埋める
+    if (!$('qOne').value.trim()) $('qOne').value = e.oneLine || '';
+    if (!$('qTags').value.trim()) $('qTags').value = (e.tags || []).join(' ');
+    if (!$('qRel').value.trim()) $('qRel').value = (e.related || []).join(' ');
+  }
+  updateTermNote();
+}
+// 保存前検索：いま書いている質問・見出し語が、すでにある項目に似ていないか
+function findSimilar(text) {
+  const t = norm(text); if (t.length < 2) return [];
+  const tb = bigramSet(t.slice(0, 120));
+  const out = [];
+  for (const e of entries) {
+    const x = idxOf(e); let s = 0;
+    if (x.term.length >= 2 && t.includes(x.term)) s = 1;
+    else if (x.tags.some(g => g.length >= 2 && t.includes(g)) || x.rel.some(g => g.length >= 2 && t.includes(g))) s = 0.6;
+    else {
+      const eb = bigramSet([x.term, x.one, x.qaQ.join(' ')].join(' ')); let m = 0;
+      for (const b of tb) if (eb.has(b)) m++;
+      s = tb.size ? m / tb.size : 0;
+    }
+    if (s >= 0.4) out.push({ e, s });
+  }
+  return out.sort((a, b) => b.s - a.s).slice(0, 3);
+}
+let simTimer = 0;
+function updateSim() {
+  clearTimeout(simTimer);
+  simTimer = setTimeout(() => {
+    if (editingQA) { $('simBox').innerHTML = ''; return; }
+    const cur = findEntryByTerm($('qTerm').value);
+    const sim = findSimilar($('qTerm').value + ' ' + $('qQuestion').value).filter(x => !cur || x.e.id !== cur.id);
+    $('simBox').innerHTML = sim.length ? '<div class="sim"><b>似ている項目があります</b>（同じことを聞いていないか確認）' + sim.map(x => '<div class="it"><span>📖 ' + esc(x.e.term) + (x.e.oneLine ? '<br><span class="note">' + esc(x.e.oneLine) + '</span>' : '') + '</span><span class="row" style="flex:none"><button class="btn sm" data-simopen="' + esc(x.e.id) + '">見る</button><button class="btn sm" data-simuse="' + esc(x.e.id) + '">ここに足す</button></span></div>').join('') + '</div>' : '';
+  }, 250);
+}
+async function saveQA() {
+  const question = $('qQuestion').value.trim(), answer = $('qAnswer').value.trim();
+  if (!question) { toast('質問を入れてください'); return; }
+  if (!answer) { toast('回答を入れてください'); return; }
+  const url = $('qUrl').value.trim();
+  if (url && !/^https?:\/\//i.test(url)) { toast('URLは https:// から始めてください'); return; }
+  const term = $('qTerm').value.trim() || firstLine(question).slice(0, 30);
+  const now = Date.now(), tags = splitList($('qTags').value), related = splitList($('qRel').value), one = $('qOne').value.trim();
+  const old = editingQA ? qaById.get(editingQA) : null;
+  let e = findEntryByTerm(term);
+  if (e) e = Object.assign({}, e, { oneLine: one || e.oneLine || '', tags: union(e.tags, tags), related: union(e.related, related), updatedAt: now });
+  else e = { id: uid(), term, oneLine: one, tags, related, note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
+  const q = { id: old ? old.id : uid(), entryId: e.id, question, answer, judgment: $('qJudgment').value.trim(), sourceType: $('qSource').value, sourceUrl: url, createdAt: old ? old.createdAt : now, updatedAt: now };
+  await writeEntries([e]); await writeQAs([q]);
+  lsSet('kd_last_source', q.sourceType);
+  closeSheet('shQA'); refresh();
+  if ($('shEntry').classList.contains('open') && viewId) openEntry(viewId);
+  toast(old ? 'Q&Aを更新しました' : 'Q&Aを保存しました');
+}
+async function deleteQA(id) {
+  const q = qaById.get(id); if (!q) return;
+  if (!confirm('このQ&Aを削除します。元に戻せません。よろしいですか？')) return;
+  qas = qas.filter(x => x.id !== id); rebuild(); await idbDel('qas', [id]);
+  refresh(); if (viewId) openEntry(viewId); toast('削除しました');
+}
+
+/* ───────── AI整理（Worker の /ai 経由） ───────── */
+const SECRET_RE = [/sk-[A-Za-z0-9_-]{16,}/, /AIza[0-9A-Za-z_-]{20,}/, /Bearer\s+[A-Za-z0-9._-]{16,}/i, /(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*\S+/i, /\b[A-Za-z0-9+\/_-]{40,}\b/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /\b(ghp|gho|ghs|github_pat)_[A-Za-z0-9_]{20,}/];
+function redact(text) {
+  let removed = 0;
+  const out = String(text).split('\n').filter(l => { if (SECRET_RE.some(r => r.test(l))) { removed++; return false; } return true; });
+  return { text: out.join('\n'), removed };
+}
+function aiConfig() {
+  return {
+    endpoint: (lsGet('kd_endpoint') || lsGet('qr_sync_endpoint')).trim().replace(/\/+$/, ''),   // 空なら、同じブラウザの quick-ref の設定を借りる
+    token: (lsGet('kd_token') || lsGet('qr_sync_token')).trim(),
+    provider: lsGet('kd_provider') || 'gemini',
+    model: lsGet('kd_model').trim()
+  };
+}
+const DEFAULT_MODEL = { gemini: 'gemini-3.5-flash-lite', openai: 'gpt-4o-mini', claude: 'claude-sonnet-4-6' };
+async function callAI(prompt) {
+  const c = aiConfig();
+  if (!c.endpoint || !c.token) throw new Error('AIの接続が未設定です（⚙︎ 設定 → AI整理の接続）');
+  if (!/^[\x21-\x7e]+$/.test(c.token)) throw new Error('トークンに使えない文字が含まれています。入れ直してください');
+  const model = /^[A-Za-z0-9._-]{3,60}$/.test(c.model) ? c.model : DEFAULT_MODEL[c.provider];
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 90000);
+  try {
+    const r = await fetch(c.endpoint + '/ai', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + c.token }, body: JSON.stringify({ provider: c.provider, model, maxTokens: c.provider === 'gemini' ? undefined : 700, prompt }) });
+    if (r.status === 401) throw new Error('同期トークンが違います');
+    if (!r.ok) throw new Error('AI中継がエラーを返しました（' + r.status + '）');
+    const d = await r.json();
+    return d && typeof d.text === 'string' ? d.text : '';
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new Error('時間切れです（90秒）。回線を確認してやり直してください');
+    throw e;
+  } finally { clearTimeout(tm); }
+}
+function parseAI(raw) {
+  const s = String(raw || '').replace(/```[a-z]*/gi, '').trim(), a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  let o; try { o = JSON.parse(s.slice(a, b + 1)); } catch (_) { return null; }
+  if (!o || typeof o !== 'object') return null;
+  const str = (v, n) => typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
+  const list = (v, n) => [...new Set((Array.isArray(v) ? v : []).map(x => String(x == null ? '' : x).replace(/^#/, '').replace(/\s+/g, '').slice(0, 20)).filter(Boolean))].slice(0, n);
+  const r = { term: str(o.term, 40), oneLine: str(o.oneLine, 120), tags: list(o.tags, 6), related: list(o.related, 6) };
+  return (r.term || r.oneLine || r.tags.length || r.related.length) ? r : null;
+}
+async function runAI() {
+  const btn = $('btnAI'); if (btn.disabled) return;
+  const question = $('qQuestion').value.trim(), answer = $('qAnswer').value.trim();
+  if (!question || !answer) { toast('質問と回答を入れてから押してください'); return; }
+  const rd = redact(question + '\n' + answer);
+  if (!confirm('質問と回答をAIに送って、見出し語・一言・タグ・関連用語の候補を作ります。（自分の判断は送りません）' + (rd.removed ? '\n秘密らしい行が' + rd.removed + '行あります。その行は除いて送ります。' : '') + '\nよろしいですか？')) return;
+  const cnt = {}; entries.forEach(e => (e.tags || []).forEach(t => { cnt[t] = (cnt[t] || 0) + 1; }));
+  const tagsKnown = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 30);
+  const terms = entries.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 60).map(e => e.term);
+  const qText = question.slice(0, 1500);
+  const aText = redact(answer).text.slice(0, 6000);
+  const prompt = '以下は、AIに聞いた「質問」と、その「回答」です。辞書の項目として整理してください。\n必ずJSONだけを返してください（前置き・説明・コードブロックは不要）:\n' +
+    '{"term":"見出し語（20字以内の短い名詞）","oneLine":"一言説明（60字以内）","tags":["タグ1","タグ2"],"related":["関連用語1","関連用語2"]}\n' +
+    'ルール:\n- 回答に書かれていることだけで作る。書かれていないことは足さない\n- term は、下の既存の見出し語に合うものがあれば、そのまま使う\n- tags は2〜5個、related は0〜5個。短い語で。tags は下の既存タグに合うものがあれば使う\n' +
+    '既存の見出し語: ' + (terms.join(', ') || '（なし）') + '\n既存タグ: ' + (tagsKnown.join(', ') || '（なし）') + '\n\n【質問】\n' + redact(qText).text + '\n\n【回答】\n' + aText;
+  const run = ++aiRun; btn.disabled = true; btn.textContent = '✨ 整理中…（最大90秒）';
+  let cand = null, err = '';
+  try { cand = parseAI(await callAI(prompt)); if (!cand) err = 'AIの返事を読み取れませんでした。もう一度お試しください'; } catch (e) { err = (e && e.message) || String(e); }
+  if (run !== aiRun) return;
+  btn.disabled = false; btn.textContent = '✨ AI整理をやり直す';
+  if (err) { toast('整理できませんでした：' + err.slice(0, 80)); return; }
+  aiCand = cand; drawCand();
+}
+function drawCand() {
+  const c = aiCand; if (!c) { $('aiBox').innerHTML = ''; return; }
+  const curTags = new Set(splitList($('qTags').value).map(norm)), curRel = new Set(splitList($('qRel').value).map(norm));
+  const tl = c.tags.filter(t => !curTags.has(norm(t))), rl = c.related.filter(t => !curRel.has(norm(t)));
+  let h = '<div class="cand"><b style="color:#d98a00">✦ AIの候補</b><span class="note">（まだ入っていません。使うものだけ押してください）</span>';
+  h += '<button class="btn pri wide" data-ai="all" style="margin-top:8px">✓ すべて採用</button>';
+  if (c.term) h += '<div class="lab">見出し語</div><div>' + esc(c.term) + (findEntryByTerm(c.term) ? ' <span class="note">（既存の項目です）</span>' : '') + '</div><button class="btn sm" data-ai="term" style="margin-top:4px">✓ 見出し語に使う</button>';
+  if (c.oneLine) h += '<div class="lab">一言説明</div><div>' + esc(c.oneLine) + '</div><button class="btn sm" data-ai="one" style="margin-top:4px">✓ 一言に使う</button>';
+  h += '<div class="lab">タグ（押すと追加）</div>' + (tl.length ? tl.map(t => '<button class="tagbtn" data-ai="tag" data-v="' + esc(t) + '">＋#' + esc(t) + '</button>').join('') : '<span class="note">なし／追加済み</span>');
+  h += '<div class="lab">関連用語（押すと追加）</div>' + (rl.length ? rl.map(t => '<button class="tagbtn" data-ai="rel" data-v="' + esc(t) + '">＋' + esc(t) + '</button>').join('') : '<span class="note">なし／追加済み</span>');
+  $('aiBox').innerHTML = h + '</div>';
+}
+function adoptAI(kind, v) {
+  const c = aiCand; if (!c) return;
+  const setIf = (id, val) => { const el = $(id); if (el.value.trim() && el.value.trim() !== val && !confirm('入力済みの内容を、AIの候補に置き換えますか？')) return false; el.value = val; return true; };
+  const addTo = (id, list) => { $(id).value = union(splitList($(id).value), list).join(' '); };
+  if (kind === 'term') { if (setIf('qTerm', c.term)) onTermChange(); }
+  else if (kind === 'one') setIf('qOne', c.oneLine);
+  else if (kind === 'tag') addTo('qTags', [v]);
+  else if (kind === 'rel') addTo('qRel', [v]);
+  else if (kind === 'all') {
+    if (c.term && !setIf('qTerm', c.term)) return;
+    if (c.term) onTermChange();
+    if (c.oneLine) setIf('qOne', c.oneLine);
+    addTo('qTags', c.tags); addTo('qRel', c.related);
+  }
+  updateSim(); drawCand();
+}
+
+/* ───────── バックアップ・取り込み ───────── */
+function stamp() { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()); }
+function exportData() {
+  const payload = { app: 'knowledge-dictionary', version: 1, exportedAt: Date.now(), entries, qas };
+  const name = 'knowledge-dictionary_' + stamp() + '_' + entries.length + '項目.json';
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  lsSet('kd_last_backup', String(Date.now())); renderWarn(); renderSettings();
+  toast('書き出しました：' + name);
+}
+async function importOwn(file) {
+  let o; try { o = JSON.parse(await file.text()); } catch (_) { toast('JSONとして読めませんでした'); return; }
+  if (!o || o.app !== 'knowledge-dictionary' || !Array.isArray(o.entries) || !Array.isArray(o.qas)) { toast('知識辞書の書き出しファイルではありません'); return; }
+  let ne = 0, nq = 0;
+  const ee = [], qq = [];
+  for (const e of o.entries) { if (!e || !e.id || !e.term) continue; const cur = entryById.get(e.id); if (!cur || (e.updatedAt || 0) > (cur.updatedAt || 0)) { ee.push(e); ne++; } }
+  for (const q of o.qas) { if (!q || !q.id || !q.entryId) continue; const cur = qaById.get(q.id); if (!cur || (q.updatedAt || 0) > (cur.updatedAt || 0)) { qq.push(q); nq++; } }
+  if (ee.length) await writeEntries(ee);
+  if (qq.length) await writeQAs(qq);
+  refresh(); renderSettings(); toast('読み込みました：項目 ' + ne + '件・Q&A ' + nq + '件');
+}
+async function importQuickRef(file) {
+  let o; try { o = JSON.parse(await file.text()); } catch (_) { toast('JSONとして読めませんでした'); return; }
+  const items = o && Array.isArray(o.items) ? o.items : Array.isArray(o) ? o : null;
+  if (!items) { toast('quick-ref の書き出しファイルではありません'); return; }
+  let added = 0, dup = 0, skipped = 0;
+  const touchedE = new Map(), newQ = [];
+  const getE = term => { const n = norm(term); return [...touchedE.values()].find(e => norm(e.term) === n) || findEntryByTerm(term); };
+  for (const it of items) {
+    if (!it || it.type !== 'ai_qa' || !it.qa || it.sensitive || !it.qa.question || !it.qa.answer) { skipped++; continue; }
+    const qid = 'qr_' + it.id;
+    if (qaById.has(qid)) { dup++; continue; }
+    const now = Date.now(), term = (String(it.title || '').trim() || firstLine(it.qa.question)).slice(0, 60);
+    const tags = (it.tags || []).filter(t => t && t !== 'AI Q&A');
+    let e = getE(term);
+    if (e) e = Object.assign({}, e, { oneLine: e.oneLine || it.qa.summary || '', tags: union(e.tags, tags), updatedAt: Math.max(e.updatedAt || 0, it.updatedAt || 0) || now });
+    else e = { id: uid(), term, oneLine: it.qa.summary || '', tags, related: [], note: '', understanding: 'unknown', checkedAt: null, createdAt: it.createdAt || now, updatedAt: it.updatedAt || now };
+    touchedE.set(e.id, e);
+    newQ.push({ id: qid, entryId: e.id, question: it.qa.question, answer: it.qa.answer, judgment: it.qa.judgment || '', sourceType: it.qa.sourceType || 'other', sourceUrl: it.qa.sourceUrl || '', createdAt: it.createdAt || now, updatedAt: it.updatedAt || now });
+    added++;
+  }
+  if (touchedE.size) await writeEntries([...touchedE.values()]);
+  if (newQ.length) await writeQAs(newQ);
+  refresh(); renderSettings();
+  toast('取り込み ' + added + '件／すでにあった ' + dup + '件／対象外 ' + skipped + '件');
+}
+
+/* ───────── 設定 ───────── */
+async function renderSettings() {
+  const last = Number(lsGet('kd_last_backup')) || 0;
+  let pers = '';
+  try { if (navigator.storage && navigator.storage.persisted) pers = (await navigator.storage.persisted()) ? '　／　端末による自動削除：されにくい設定' : '　／　端末による自動削除：される可能性あり（バックアップ推奨）'; } catch (_) {}
+  $('stStat').innerHTML = '項目 <b>' + entries.length + '</b>　Q&amp;A <b>' + qas.length + '</b><br><span class="note">最後のバックアップ：' + (last ? dstr(last) : 'まだありません') + esc(pers) + '</span>';
+  const c = aiConfig();
+  $('sEndpoint').value = lsGet('kd_endpoint'); $('sToken').value = ''; $('sProvider').value = c.provider; $('sModel').value = lsGet('kd_model');
+  $('aiStat').textContent = (c.endpoint && c.token) ? '接続設定あり' + (lsGet('kd_endpoint') ? '' : '（quick-ref の設定を借りています）') : '未設定（AI整理を使わなければ、設定は不要です）';
+}
+function saveAI() {
+  const ep = $('sEndpoint').value.trim(), tk = $('sToken').value.trim();
+  if (ep && !/^https:\/\//i.test(ep)) { toast('エンドポイントは https:// から始めてください'); return; }
+  if (tk && !/^[\x21-\x7e]+$/.test(tk)) { toast('トークンに使えない文字が含まれています'); return; }
+  lsSet('kd_endpoint', ep); if (tk) lsSet('kd_token', tk);
+  lsSet('kd_provider', $('sProvider').value); lsSet('kd_model', $('sModel').value.trim());
+  renderSettings(); toast('保存しました');
+}
+async function testAI() {
+  toast('接続テスト中…');
+  try { const t = await callAI('「OK」とだけ返してください。'); toast(t.trim() ? '接続OK：' + t.trim().slice(0, 20) : '接続しましたが、返事が空でした'); }
+  catch (e) { toast('失敗：' + ((e && e.message) || e).slice(0, 80)); }
+}
+
+/* ───────── 配線 ───────── */
+function wire() {
+  $('q').addEventListener('input', e => { searchQuery = e.target.value; renderList(); });
+  $('btnClear').addEventListener('click', () => { $('q').value = ''; searchQuery = ''; renderList(); $('q').focus(); });
+  $('fchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filterUnd = b.dataset.f; document.querySelectorAll('.fchip').forEach(x => x.classList.toggle('on', x === b)); renderList(); });
+  $('btnAdd').addEventListener('click', () => openQAForm());
+  $('btnSettings').addEventListener('click', () => { renderSettings(); openSheet('shSet'); });
+  document.body.addEventListener('click', e => {
+    const a = e.target.closest('[data-act]');
+    if (a && a.dataset.act === 'add') { openQAForm(); return; }
+    if (a && a.dataset.act === 'settings') { renderSettings(); openSheet('shSet'); return; }
+  });
+  $('list').addEventListener('click', e => { const c = e.target.closest('[data-open]'); if (c) openEntry(c.dataset.open); });
+  $('enClose').addEventListener('click', () => { closeSheet('shEntry'); viewId = null; });
+  $('enEdit').addEventListener('click', openEntryEdit);
+  $('enBody').addEventListener('click', async e => {
+    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open]'); if (!t) return;
+    const d = t.dataset;
+    if (d.und) await setUnderstanding(d.und);
+    else if (d.search) { closeSheet('shEntry'); viewId = null; $('q').value = d.search; searchQuery = d.search; filterUnd = 'all'; document.querySelectorAll('.fchip').forEach(x => x.classList.toggle('on', x.dataset.f === 'all')); renderList(); }
+    else if (d.rel) { const r = findEntryByTerm(d.rel); if (r) openEntry(r.id); else { closeSheet('shEntry'); viewId = null; $('q').value = d.rel; searchQuery = d.rel; renderList(); } }
+    else if (d.copy) { const q = qaById.get(d.qa), en = q && entryById.get(q.entryId); if (q && en) await copyText(d.copy === 'a' ? q.answer : qaAskText(en, q), d.copy === 'a' ? '回答をコピーしました' : '再質問用の文をコピーしました。AIに貼って、続きを書いてください'); }
+    else if (d.qaedit) openQAForm({ qaId: d.qaedit });
+    else if (d.qadel) await deleteQA(d.qadel);
+    else if (d.addto) { const en = entryById.get(d.addto); if (en) openQAForm({ term: en.term }); }
+    else if (d.open) openEntry(d.open);
+  });
+  $('eeCancel').addEventListener('click', () => closeSheet('shEntryEdit'));
+  $('eeSave').addEventListener('click', () => { void saveEntryEdit(); });
+  $('eeDelete').addEventListener('click', () => { void deleteEntry(); });
+  $('qaCancel').addEventListener('click', () => { if (($('qQuestion').value.trim() || $('qAnswer').value.trim()) && !editingQA && !confirm('入力した内容は保存されていません。閉じますか？')) return; closeSheet('shQA'); });
+  $('qaSave').addEventListener('click', () => { void saveQA(); });
+  $('btnAI').addEventListener('click', () => { void runAI(); });
+  $('qTerm').addEventListener('input', () => { updateTermNote(); updateSim(); });
+  $('qTerm').addEventListener('change', onTermChange);
+  $('qQuestion').addEventListener('input', updateSim);
+  $('shQA').addEventListener('click', async e => {
+    const t = e.target.closest('[data-paste],[data-ai],[data-simopen],[data-simuse]'); if (!t) return;
+    const d = t.dataset;
+    if (d.paste) {
+      try { const raw = await navigator.clipboard.readText(); if (!raw.trim()) { toast('クリップボードが空です'); return; } const el = $(d.paste); el.value = el.value.trim() ? el.value.replace(/\s+$/, '') + '\n\n' + raw.trim() : raw.trim(); updateSim(); toast('貼り付けました'); }
+      catch (_) { toast('貼り付けできませんでした。欄を長押しして貼り付けてください'); }
+    } else if (d.ai) adoptAI(d.ai, d.v);
+    else if (d.simopen) openEntry(d.simopen);
+    else if (d.simuse) { const en = entryById.get(d.simuse); if (en) { $('qTerm').value = en.term; onTermChange(); updateSim(); toast('「' + en.term + '」に足します'); } }
+  });
+  $('stClose').addEventListener('click', () => closeSheet('shSet'));
+  $('btnExport').addEventListener('click', exportData);
+  $('btnImportOwn').addEventListener('click', () => $('fileOwn').click());
+  $('btnImportQR').addEventListener('click', () => $('fileQR').click());
+  $('fileOwn').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importOwn(f); });
+  $('fileQR').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importQuickRef(f); });
+  $('btnSaveAI').addEventListener('click', saveAI);
+  $('btnTestAI').addEventListener('click', () => { void testAI(); });
+}
+
+async function init() {
+  $('ver').textContent = APP_VERSION;
+  wire();
+  try { db = await openDB(); entries = await idbAll('entries'); qas = await idbAll('qas'); }
+  catch (e) { memOnly = true; db = null; entries = []; qas = []; }
+  rebuild(); refresh();
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+init();
+</script>
+</body>
+</html>
