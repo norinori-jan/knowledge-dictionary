@@ -100,6 +100,12 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
 .ctx{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
 .lab .btn.sm{margin-left:8px}
 .hidden{display:none!important}
+.qc-box{margin:6px 0 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.qc-lab{font-size:12px;color:var(--sub);width:100%}
+.qc{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:14px;color:var(--text);font-family:inherit}
+.qc.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.qc.mk{border-style:dashed;color:var(--accent);border-color:var(--accent)}
+.qc.has{background:var(--bg)}
 </style>
 </head>
 <body>
@@ -277,7 +283,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
 
 <script>
 'use strict';
-const APP_VERSION = '0.3.1';
+const APP_VERSION = '0.3.2';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -1021,6 +1027,11 @@ function drawPicker() {
 }
 function insertLink(term) {
   const el = $(pickTarget), t = String(term).replace(/[\[\]|]/g, '').trim(); if (!el || !t) return;
+  if (pickTarget === 'qRel' || pickTarget === 'eeRel') {   // 関連用語欄：[[ ]] を付けず、語だけを足す
+    const w = t.replace(/\s+/g, '-'), cur = splitList(el.value);
+    if (!cur.some(x => norm(x) === norm(w))) el.value = cur.concat(w).join(' ');
+    el.dispatchEvent(new Event('input')); closeSheet('shPick'); toast('関連用語に足しました'); return;
+  }
   const s0 = el.selectionStart == null ? el.value.length : el.selectionStart, e0 = el.selectionEnd == null ? s0 : el.selectionEnd, ins = '[[' + t + ']]';
   el.value = el.value.slice(0, s0) + ins + el.value.slice(e0);
   try { el.setSelectionRange(s0 + ins.length, s0 + ins.length); } catch (_) {}
@@ -1174,9 +1185,55 @@ function wire() {
   $('btnTestAI').addEventListener('click', () => { void testAI(); });
 }
 
+/* ───────── タグ・関連用語を、その場で選ぶ／作る ───────── */
+const CHIP_FORMS = [
+  { sheet: 'shQA', tags: 'qTags', rel: 'qRel', self: 'qTerm' },
+  { sheet: 'shEntryEdit', tags: 'eeTags', rel: 'eeRel', self: 'eeTerm' }
+];
+function allTagCounts() { const m = new Map(); for (const e of entries) for (const t of e.tags || []) { const k = norm(t); if (!k) continue; const o = m.get(k) || { t, n: 0 }; o.n++; m.set(k, o); } return [...m.values()].sort((a, b) => b.n - a.n || a.t.localeCompare(b.t)); }
+function renderChips(f) {
+  const tb = $(f.tags + 'Chips'), rb = $(f.rel + 'Chips'); if (!tb || !rb) return;
+  const cur = splitList($(f.tags).value), curN = new Set(cur.map(norm));
+  const pool = allTagCounts().filter(o => !curN.has(norm(o.t))).slice(0, 14);
+  tb.innerHTML = (cur.length || pool.length ? '<div class="qc-lab">タグ（押すと 付け外し）</div>' : '') +
+    cur.map(t => '<button type="button" class="qc on" data-tg="' + esc(t) + '">' + esc(t) + ' ✓</button>').join('') +
+    pool.map(o => '<button type="button" class="qc" data-tg="' + esc(o.t) + '">' + esc(o.t) + '</button>').join('');
+  const rel = splitList($(f.rel).value), me = norm($(f.self).value);
+  rb.innerHTML = rel.length ? '<div class="qc-lab">関連用語（点線＝まだ項目がない。押すと、ここで項目を作れます）</div>' +
+    rel.map(t => (norm(t) === me || findEntryByTerm(t)) ? '<span class="qc has">📖 ' + esc(t) + '</span>' : '<button type="button" class="qc mk" data-mk="' + esc(t) + '">＋ ' + esc(t) + ' を項目にする</button>').join('') : '';
+  f._sig = $(f.tags).value + '|' + $(f.rel).value + '|' + $(f.self).value + '|' + entries.length;
+}
+async function chipClick(f, ev) {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.tg != null) {
+    const t = b.dataset.tg, cur = splitList($(f.tags).value), n = norm(t);
+    $(f.tags).value = (cur.some(x => norm(x) === n) ? cur.filter(x => norm(x) !== n) : cur.concat(t)).join(' ');
+    renderChips(f);
+  } else if (b.dataset.mk != null) {
+    const term = b.dataset.mk.trim(); if (!term || findEntryByTerm(term)) { renderChips(f); return; }
+    const now = Date.now();
+    await writeEntries([{ id: uid(), term: term.slice(0, 60), oneLine: '', tags: [], related: [], note: '', kind: 'term', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now }]);
+    refresh(); renderChips(f); toast('「' + term + '」の項目を作りました（中身はあとで書けます）');
+  }
+}
+function initChips() {
+  for (const f of CHIP_FORMS) {
+    $(f.tags).insertAdjacentHTML('afterend', '<div class="qc-box" id="' + f.tags + 'Chips"></div>');
+    $(f.rel).insertAdjacentHTML('afterend', '<div class="qc-box" id="' + f.rel + 'Chips"></div><div style="margin-top:4px"><button type="button" class="btn sm" data-relpick="' + f.rel + '">🔗 既存の項目から選ぶ／新しい語を足す</button></div>');
+    $(f.tags + 'Chips').addEventListener('click', ev => { void chipClick(f, ev); });
+    $(f.rel + 'Chips').addEventListener('click', ev => { void chipClick(f, ev); });
+    [f.tags, f.rel, f.self].forEach(id => $(id).addEventListener('input', () => renderChips(f)));
+    $(f.sheet).addEventListener('click', ev => {
+      const b = ev.target.closest('[data-relpick]'); if (!b || b.dataset.relpick !== f.rel) return;
+      openPicker(f.rel);
+    });
+  }
+  setInterval(() => { for (const f of CHIP_FORMS) { if ($(f.sheet).classList.contains('open') && f._sig !== ($(f.tags).value + '|' + $(f.rel).value + '|' + $(f.self).value + '|' + entries.length)) renderChips(f); } }, 300);
+}
+
 async function init() {
   $('ver').textContent = APP_VERSION;
-  wire();
+  wire(); initChips();
   try { db = await openDB(); entries = await idbAll('entries'); qas = await idbAll('qas'); }
   catch (e) { memOnly = true; db = null; entries = []; qas = []; }
   rebuild(); refresh();
