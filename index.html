@@ -90,6 +90,15 @@ details.qa .qa-body{padding:0 0 12px}
 .cand{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--card)}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom, 0px) + 84px);transform:translateX(-50%);background:#222;color:#fff;border-radius:12px;padding:10px 16px;font-size:14px;z-index:90;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:.96}
+.wl{border:0;background:transparent;color:var(--accent);font:inherit;padding:0 1px;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+.wl.unres{color:var(--sub);text-decoration-style:dashed}
+.kbadge{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-right:6px;font-weight:600;vertical-align:2px;white-space:nowrap}
+.pick-item{padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
+#gsvg{width:100%;height:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+#gsvg text{font-size:11px;fill:var(--text);pointer-events:none}
+.ctx{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+.lab .btn.sm{margin-left:8px}
 .hidden{display:none!important}
 </style>
 </head>
@@ -98,6 +107,7 @@ details.qa .qa-body{padding:0 0 12px}
   <div class="top">
     <div class="top-row">
       <div class="title">📖 知識辞書</div>
+      <button class="icon-btn" id="btnGraph" aria-label="つながり">🕸</button>
       <button class="icon-btn" id="btnSettings" aria-label="設定とバックアップ">⚙︎</button>
     </div>
     <div class="search">
@@ -111,13 +121,19 @@ details.qa .qa-body{padding:0 0 12px}
       <button class="fchip" data-f="learning">理解中</button>
       <button class="fchip" data-f="known">理解済</button>
     </div>
+    <div class="chips" id="kchips">
+      <button class="fchip on" data-k="all">全種類</button>
+      <button class="fchip" data-k="term">用語</button>
+      <button class="fchip" data-k="howto">手順</button>
+      <button class="fchip" data-k="idea">考え方</button>
+    </div>
   </div>
   <div id="warnBox"></div>
   <div class="count" id="count"></div>
   <div id="list"></div>
 </div>
 
-<div class="bar"><div class="bar-in"><button class="btn pri wide" id="btnAdd">＋ Q&amp;Aを足す</button></div></div>
+<div class="bar"><div class="bar-in row"><button class="btn pri" id="btnAsk" style="flex:1.3">🤖 AIに聞く</button><button class="btn" id="btnAdd" style="flex:1">＋ Q&amp;Aを足す</button></div></div>
 
 <!-- 項目（辞書カード）：読む画面 -->
 <div class="sheet" id="shEntry">
@@ -130,10 +146,12 @@ details.qa .qa-body{padding:0 0 12px}
   <div class="sh-head"><button id="eeCancel">キャンセル</button><h2>項目を編集</h2><button id="eeSave">保存</button></div>
   <div class="sh-body">
     <label class="lab" for="eeTerm">見出し語</label><input id="eeTerm" maxlength="60">
+    <label class="lab" for="eeKind">種類</label><select id="eeKind"><option value="term">用語（言葉の意味）</option><option value="howto">手順（やり方の流れ）</option><option value="idea">考え方（判断の理由・方針）</option></select>
     <label class="lab" for="eeOne">一言説明</label><input id="eeOne" maxlength="120" placeholder="例：APIの認証に使うトークン形式">
     <label class="lab" for="eeTags">タグ（カンマか空白で区切る）</label><input id="eeTags" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="lab" for="eeRel">関連用語（カンマか空白で区切る）</label><input id="eeRel" autocapitalize="none" autocorrect="off" spellcheck="false">
-    <label class="lab" for="eeNote">自分の理解（AIの回答とは別に、自分の言葉で）</label><textarea id="eeNote" rows="5"></textarea>
+    <label class="lab" for="eeNote" style="display:flex;justify-content:space-between;align-items:center">自分の理解（自分の言葉で。手順は「1. 2. 3.」の行で） <button class="btn sm" type="button" data-linkpick="eeNote">🔗 リンク</button></label><textarea id="eeNote" rows="6" placeholder="例：1. [[JWT]] を発行する&#10;2. [[Cookie]] に入れる"></textarea>
+    <div class="note">[[見出し語]] と書くと、その項目へのリンクになります（Obsidianと同じ書き方）。</div>
     <div class="box" style="margin-top:18px"><button class="btn danger wide" id="eeDelete">この項目を削除（Q&amp;Aも消えます）</button></div>
   </div>
 </div>
@@ -146,7 +164,7 @@ details.qa .qa-body{padding:0 0 12px}
     <label class="lab" for="qQuestion" style="display:flex;justify-content:space-between;align-items:center">質問 <button class="btn sm" type="button" data-paste="qQuestion">📋 貼り付け</button></label>
     <textarea id="qQuestion" rows="3" placeholder="AIに聞いたこと"></textarea>
     <div id="simBox"></div>
-    <label class="lab" for="qAnswer" style="display:flex;justify-content:space-between;align-items:center">回答 <button class="btn sm" type="button" data-paste="qAnswer">📋 貼り付け</button></label>
+    <label class="lab" for="qAnswer" style="display:flex;justify-content:space-between;align-items:center">回答 <span><button class="btn sm" type="button" data-linkpick="qAnswer">🔗</button><button class="btn sm" type="button" data-paste="qAnswer">📋 貼り付け</button></span></label>
     <textarea id="qAnswer" rows="7" placeholder="AIの回答"></textarea>
 
     <button class="btn wide" id="btnAI" style="margin-top:14px">✨ AI整理（候補を出す）</button>
@@ -157,15 +175,48 @@ details.qa .qa-body{padding:0 0 12px}
     <input id="qTerm" maxlength="60" list="termList" placeholder="例：JWT" autocomplete="off">
     <datalist id="termList"></datalist>
     <div class="note" id="termNote"></div>
+    <label class="lab" for="qKind">種類</label><select id="qKind"><option value="term">用語（言葉の意味）</option><option value="howto">手順（やり方の流れ）</option><option value="idea">考え方（判断の理由・方針）</option></select>
     <label class="lab" for="qOne">一言説明</label><input id="qOne" maxlength="120" placeholder="例：APIの認証に使うトークン形式">
-    <label class="lab" for="qJudgment">自分の判断（任意。AIの回答とは別に残す）</label>
+    <label class="lab" for="qJudgment" style="display:flex;justify-content:space-between;align-items:center">自分の判断（任意。AIの回答とは別に残す） <button class="btn sm" type="button" data-linkpick="qJudgment">🔗 リンク</button></label>
     <textarea id="qJudgment" rows="3" placeholder="例：今回はZustandにする。理由：規模が小さいため"></textarea>
     <label class="lab" for="qTags">タグ（カンマか空白で区切る）</label><input id="qTags" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="例：認証 API Web">
     <label class="lab" for="qRel">関連用語（カンマか空白で区切る）</label><input id="qRel" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="例：OAuth Cookie">
     <label class="lab" for="qSource">ソース</label>
-    <select id="qSource"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="gemini">Gemini</option><option value="perplexity">Perplexity</option><option value="cursor">Cursor</option><option value="manual">手入力</option><option value="other">その他</option></select>
+    <select id="qSource"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="gemini">Gemini</option><option value="openai">OpenAI(API)</option><option value="perplexity">Perplexity</option><option value="cursor">Cursor</option><option value="manual">手入力</option><option value="other">その他</option></select>
     <label class="lab" for="qUrl">ソースURL（任意）</label><input id="qUrl" type="url" placeholder="https://..." autocapitalize="none" autocorrect="off" spellcheck="false">
     <div class="note">タグと関連用語は、保存すると項目に「足されます」。消したいときは、項目の「編集」から。</div>
+  </div>
+</div>
+
+<!-- AIに聞く -->
+<div class="sheet" id="shAsk">
+  <div class="sh-head"><button id="askClose">閉じる</button><h2>AIに聞く</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <div class="banner" style="margin-top:0">💳 ここから聞くと、<b>APIのトークンを使います</b>。ChatGPT・Claude の月額プランとは<b>別枠</b>（使った分だけの課金）です。</div>
+    <label class="lab" for="aQ">質問</label>
+    <textarea id="aQ" rows="4" placeholder="分からないことを、そのまま書く"></textarea>
+    <div id="aCtx"></div>
+    <div class="note" id="aMeta"></div>
+    <button class="btn pri wide" id="btnAskGo" style="margin-top:12px">🤖 AIに聞く</button>
+    <div id="aOut"></div>
+  </div>
+</div>
+
+<!-- リンクを挿入 -->
+<div class="sheet" id="shPick">
+  <div class="sh-head"><button id="pkClose">閉じる</button><h2>リンクを入れる</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <input id="pkQ" placeholder="項目を探す（なければ、新しい語を書く）" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <div id="pkList" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- つながり -->
+<div class="sheet" id="shGraph">
+  <div class="sh-head"><button id="grClose">閉じる</button><h2 id="grTitle">つながり</h2><button id="grMode" class="hidden">全体</button></div>
+  <div class="sh-body">
+    <div class="note" id="grNote"></div>
+    <div id="grBox"></div>
   </div>
 </div>
 
@@ -197,6 +248,11 @@ details.qa .qa-body{padding:0 0 12px}
       <select id="sProvider"><option value="gemini">Gemini（おすすめ）</option><option value="openai">OpenAI</option><option value="claude">Claude</option></select>
       <label class="lab" for="sModel">モデル名（空なら標準）</label>
       <input id="sModel" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="例：gemini-3.5-flash-lite">
+      <label class="lab" for="sLimit">1日にAIを呼べる回数の上限（0で無制限）</label>
+      <input id="sLimit" type="number" min="0" max="500" inputmode="numeric" placeholder="30">
+      <label class="lab" for="sSys">回答の指示（「AIに聞く」で、質問の前に毎回付けます）</label>
+      <input id="sSys" placeholder="日本語で、結論から簡潔に答えてください。">
+      <div class="note" id="usageStat"></div>
       <div class="row" style="margin-top:10px"><button class="btn pri" id="btnSaveAI">保存</button><button class="btn" id="btnTestAI">接続テスト</button></div>
       <div class="note" id="aiStat"></div>
     </div>
@@ -213,7 +269,7 @@ details.qa .qa-body{padding:0 0 12px}
 
 <script>
 'use strict';
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.2.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -224,7 +280,9 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
 const firstLine = s => String(s || '').split('\n').map(x => x.trim()).find(Boolean) || '';
 const dstr = ms => ms ? new Date(ms).toLocaleDateString('ja-JP') : '';
 const UND = { unknown: '未理解', learning: '理解中', known: '理解済' };
-const SRC = { chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini', perplexity: 'Perplexity', cursor: 'Cursor', manual: '手入力', other: 'その他' };
+const SRC = { chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini', perplexity: 'Perplexity', cursor: 'Cursor', manual: '手入力', other: 'その他', openai: 'OpenAI(API)' };
+const KIND = { term: '用語', howto: '手順', idea: '考え方' };
+const WL_RE = /\[\[([^\[\]\n]{1,60})\]\]/g;
 
 let toastTimer = 0;
 function toast(msg) {
@@ -265,7 +323,7 @@ const idbDel = (store, ids) => new Promise((res, rej) => {
 /* ───────── 状態 ───────── */
 let entries = [], qas = [];
 let entryById = new Map(), qaById = new Map(), qasByEntry = new Map();
-let searchQuery = '', filterUnd = 'all';
+let searchQuery = '', filterUnd = 'all', filterKind = 'all';
 const idxCache = new Map();
 function rebuild() {
   entryById = new Map(entries.map(e => [e.id, e]));
@@ -273,7 +331,36 @@ function rebuild() {
   qasByEntry = new Map();
   qas.forEach(q => { if (!qasByEntry.has(q.entryId)) qasByEntry.set(q.entryId, []); qasByEntry.get(q.entryId).push(q); });
   for (const a of qasByEntry.values()) a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
-  idxCache.clear();
+  idxCache.clear(); rebuildLinks();
+}
+/* [[見出し語]] と関連用語から、項目どうしのリンクを集める（Obsidianのリンク・被リンクと同じ考え方） */
+function linksIn(text) {
+  const out = []; String(text || '').replace(WL_RE, (m, inner) => { const t = inner.split('|')[0].trim(); if (t) out.push(t); return m; }); return out;
+}
+let outLinks = new Map(), inLinks = new Map();
+function rebuildLinks() {
+  outLinks = new Map(); inLinks = new Map();
+  const termId = new Map(entries.map(e => [norm(e.term), e.id]));
+  for (const e of entries) {
+    const mine = norm(e.term), m = new Map();
+    const add = t => { const n = norm(t); if (n && n !== mine && !m.has(n)) m.set(n, String(t).trim()); };
+    [e.oneLine, e.note].forEach(t => linksIn(t).forEach(add));
+    (e.related || []).forEach(add);
+    (qasByEntry.get(e.id) || []).forEach(q => [q.question, q.answer, q.judgment].forEach(t => linksIn(t).forEach(add)));
+    outLinks.set(e.id, m);
+    for (const n of m.keys()) { const tid = termId.get(n); if (tid) { if (!inLinks.has(tid)) inLinks.set(tid, new Set()); inLinks.get(tid).add(e.id); } }
+  }
+}
+// 文章の中の [[...]] を、押せるリンクにして表示する（項目があれば青、まだなければ灰色の点線）
+function rich(text) {
+  const t = String(text == null ? '' : text); let out = '', last = 0;
+  t.replace(WL_RE, (m, inner, idx) => {
+    out += escBr(t.slice(last, idx));
+    const parts = inner.split('|'), term = parts[0].trim(), label = (parts[1] || parts[0]).trim();
+    out += '<button class="wl' + (findEntryByTerm(term) ? '' : ' unres') + '" data-wl="' + esc(term) + '">' + esc(label) + '</button>';
+    last = idx + m.length; return m;
+  });
+  return out + escBr(t.slice(last));
 }
 async function writeEntries(list) {
   list.forEach(e => { const i = entries.findIndex(x => x.id === e.id); if (i >= 0) entries[i] = e; else entries.push(e); });
@@ -331,9 +418,9 @@ function scoreEntry(e, toks) {
   }
   return total;
 }
-function searchEntries(query, und) {
+function searchEntries(query, und, kind) {
   const toks = tokensOf(query);
-  let list = entries.filter(e => und === 'all' || (e.understanding || 'unknown') === und);
+  let list = entries.filter(e => (und === 'all' || (e.understanding || 'unknown') === und) && (!kind || kind === 'all' || (e.kind || 'term') === kind));
   if (!toks.length) return list.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   return list.map(e => ({ e, s: scoreEntry(e, toks) })).filter(x => x.s > 0)
     .sort((a, b) => (b.s - a.s) || ((b.e.updatedAt || 0) - (a.e.updatedAt || 0))).map(x => x.e);
@@ -362,12 +449,12 @@ function snippetFor(e, toks) {
 /* ───────── 一覧 ───────── */
 function renderList() {
   const toks = tokensOf(searchQuery);
-  const list = searchEntries(searchQuery, filterUnd);
+  const list = searchEntries(searchQuery, filterUnd, filterKind);
   $('btnClear').style.display = searchQuery ? 'block' : 'none';
-  $('count').textContent = entries.length ? (toks.length || filterUnd !== 'all' ? list.length + '件ヒット（全' + entries.length + '項目）' : entries.length + '項目') : '';
+  $('count').textContent = entries.length ? (toks.length || filterUnd !== 'all' || filterKind !== 'all' ? list.length + '件ヒット（全' + entries.length + '項目）' : entries.length + '項目') : '';
   const box = $('list');
   if (!entries.length) {
-    box.innerHTML = '<div class="empty"><div style="font-size:40px">📖</div><div style="font-weight:700;margin-top:6px">まだ何もありません</div><div style="margin-top:6px;font-size:14px">AIに聞いたことを貼り付けて残すと、<br>あとからキーワード1つで引き出せます。</div><div class="btns"><button class="btn pri" data-act="add">＋ Q&amp;Aを足す</button><button class="btn" data-act="settings">quick-ref から取り込む</button></div></div>';
+    box.innerHTML = '<div class="empty"><div style="font-size:40px">📖</div><div style="font-weight:700;margin-top:6px">まだ何もありません</div><div style="margin-top:6px;font-size:14px">AIに聞いたことを貼り付けて残すと、<br>あとからキーワード1つで引き出せます。</div><div class="btns"><button class="btn pri" data-act="ask">🤖 AIに聞く</button><button class="btn" data-act="add">＋ Q&amp;Aを足す</button><button class="btn" data-act="settings">quick-ref から取り込む</button></div></div>';
     return;
   }
   if (!list.length) { box.innerHTML = '<div class="empty">見つかりませんでした。<br><span style="font-size:13px">語を減らすか、別の言い方で試してください。</span></div>'; return; }
@@ -375,7 +462,7 @@ function renderList() {
     const n = (qasByEntry.get(e.id) || []).length, u = e.understanding || 'unknown';
     const tags = (e.tags || []).map(t => '<span class="tag">#' + hl(t, toks) + '</span>').join('');
     const sn = snippetFor(e, toks);
-    return '<div class="card" data-open="' + esc(e.id) + '"><div class="c-top"><span class="c-term">' + hl(e.term, toks) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' +
+    return '<div class="card" data-open="' + esc(e.id) + '"><div class="c-top"><span class="c-term">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge">' + KIND[e.kind] + '</span>' : '') + hl(e.term, toks) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' +
       (sn ? '<div class="c-one">' + hl(sn, toks) + '</div>' : '') + (tags ? '<div class="c-tags">' + tags + '</div>' : '') +
       '<div class="c-meta">Q&amp;A ' + n + '件 · ' + dstr(e.updatedAt) + '</div></div>';
   }).join('');
@@ -391,7 +478,8 @@ function refresh() { renderList(); renderWarn(); renderTermList(); }
 function renderTermList() { $('termList').innerHTML = entries.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 200).map(e => '<option value="' + esc(e.term) + '">').join(''); }
 
 /* ───────── シート ───────── */
-function openSheet(id) { $(id).classList.add('open'); $(id).scrollTop = 0; document.body.style.overflow = 'hidden'; }
+let zTop = 50;
+function openSheet(id) { $(id).style.zIndex = ++zTop; $(id).classList.add('open'); $(id).scrollTop = 0; document.body.style.overflow = 'hidden'; }
 function closeSheet(id) { $(id).classList.remove('open'); if (!document.querySelector('.sheet.open')) document.body.style.overflow = ''; }
 
 /* ───────── 項目（読む画面） ───────── */
@@ -408,19 +496,19 @@ function openEntry(id) {
   const mine = new Set((e.tags || []).map(norm));
   const rel = entries.filter(o => o.id !== id).map(o => ({ o, n: (o.tags || []).filter(t => mine.has(norm(t))).length })).filter(x => x.n > 0)
     .sort((a, b) => (b.n - a.n) || ((b.o.updatedAt || 0) - (a.o.updatedAt || 0))).slice(0, 5);
-  let h = '<div class="v-term">' + esc(e.term) + '</div>';
-  if (e.oneLine) h += '<div style="font-size:17px;margin-top:4px">' + esc(e.oneLine) + '</div>';
+  let h = '<div class="v-term">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge" style="font-size:12px">' + KIND[e.kind] + '</span>' : '') + esc(e.term) + '</div>';
+  if (e.oneLine) h += '<div style="font-size:17px;margin-top:4px">' + rich(e.oneLine) + '</div>';
   h += '<div class="und-row">' + ['unknown', 'learning', 'known'].map(k => '<button class="und-' + k + (u === k ? ' on' : '') + '" data-und="' + k + '">' + UND[k] + '</button>').join('') + '</div>';
   if (e.checkedAt) h += '<div class="note" style="margin-top:-4px">理解度を確認した日：' + dstr(e.checkedAt) + '</div>';
   if ((e.tags || []).length) h += '<div style="margin:8px 0">' + e.tags.map(t => '<button class="tagbtn" data-search="' + esc(t) + '">#' + esc(t) + '</button>').join('') + '</div>';
   if ((e.related || []).length) h += '<div class="sec-h">関連用語</div><div>' + e.related.map(t => '<button class="tagbtn' + (findEntryByTerm(t) ? ' has' : '') + '" data-rel="' + esc(t) + '">' + (findEntryByTerm(t) ? '📖 ' : '') + esc(t) + '</button>').join('') + '</div><div class="note">📖 付きは、辞書に項目があります。</div>';
-  if (e.note) h += '<div class="box" style="border-color:var(--accent)"><div class="lab">自分の理解</div><div>' + escBr(e.note) + '</div></div>';
+  if (e.note) h += '<div class="box" style="border-color:var(--accent)"><div class="lab">自分の理解</div><div>' + rich(e.note) + '</div></div>';
   h += '<div class="sec-h" style="margin-top:18px">Q&amp;A（' + qs.length + '件）</div>';
   h += qs.map((q, i) => {
-    return '<details class="qa"' + (qs.length === 1 ? ' open' : '') + '><summary>' + esc(firstLine(q.question).slice(0, 80) || '(無題)') + '<div class="qa-meta">' + esc(SRC[q.sourceType] || 'その他') + ' · ' + dstr(q.createdAt) + '</div></summary><div class="qa-body">' +
-      '<div class="lab" style="margin-top:0">質問</div><div>' + escBr(q.question) + '</div>' +
-      '<div class="lab">AIの回答</div><div>' + escBr(q.answer) + '</div>' +
-      (q.judgment ? '<div class="lab">自分の判断</div><div style="border-left:3px solid var(--accent);padding-left:10px">' + escBr(q.judgment) + '</div>' : '') +
+    return '<details class="qa"' + (qs.length === 1 ? ' open' : '') + '><summary>' + esc(firstLine(q.question).slice(0, 80) || '(無題)') + '<div class="qa-meta">' + esc(SRC[q.sourceType] || 'その他') + ' · ' + dstr(q.createdAt) + (q.viaApp ? ' · アプリから質問' : '') + '</div></summary><div class="qa-body">' +
+      '<div class="lab" style="margin-top:0">質問</div><div>' + rich(q.question) + '</div>' +
+      '<div class="lab">AIの回答</div><div>' + rich(q.answer) + '</div>' +
+      (q.judgment ? '<div class="lab">自分の判断</div><div style="border-left:3px solid var(--accent);padding-left:10px">' + rich(q.judgment) + '</div>' : '') +
       (q.sourceUrl && /^https?:\/\//i.test(q.sourceUrl) ? '<div style="margin-top:8px"><a href="' + esc(q.sourceUrl) + '" target="_blank" rel="noopener noreferrer">🔗 元の会話を開く</a></div>' : '') +
       '<div class="row" style="margin-top:10px"><button class="btn sm" data-copy="a" data-qa="' + esc(q.id) + '">📋 回答をコピー</button><button class="btn sm" data-copy="ask" data-qa="' + esc(q.id) + '">📋 再質問用にコピー</button></div>' +
       '<div class="row" style="margin-top:8px"><button class="btn sm" data-qaedit="' + esc(q.id) + '">編集</button><button class="btn sm danger" data-qadel="' + esc(q.id) + '">削除</button></div></div></details>';
@@ -428,6 +516,12 @@ function openEntry(id) {
   h += '<button class="btn wide" data-addto="' + esc(id) + '" style="margin-top:8px">＋ この項目にQ&amp;Aを足す</button>';
   h += '<div class="note">「再質問用にコピー」は、この項目の質問・回答・自分の判断・自分の理解をまとめて、AIに続きを聞くための文をコピーします。</div>';
   if (rel.length) h += '<div class="sec-h" style="margin-top:18px">関連する項目（同じタグ）</div>' + rel.map(x => '<div class="card" data-open="' + esc(x.o.id) + '" style="margin:6px 0"><span class="c-term" style="font-size:16px">' + esc(x.o.term) + '</span>' + (x.o.oneLine ? '<div class="c-one">' + esc(x.o.oneLine) + '</div>' : '') + '</div>').join('');
+  const back = [...(inLinks.get(id) || [])].map(i => entryById.get(i)).filter(Boolean).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const termSet = new Set(entries.map(x => norm(x.term)));
+  const unres = [...(outLinks.get(id) || new Map())].filter(([n]) => !termSet.has(n)).map(([, raw]) => raw);
+  if (back.length) h += '<div class="sec-h" style="margin-top:18px">この項目にリンクしている項目（' + back.length + '）</div>' + back.map(o => '<div class="card" data-open="' + esc(o.id) + '" style="margin:6px 0"><span class="c-term" style="font-size:16px">' + (o.kind && o.kind !== 'term' ? '<span class="kbadge">' + KIND[o.kind] + '</span>' : '') + esc(o.term) + '</span>' + (o.oneLine ? '<div class="c-one">' + esc(o.oneLine) + '</div>' : '') + '</div>').join('');
+  if (unres.length) h += '<div class="sec-h" style="margin-top:14px">まだ項目がないリンク（押すと作れます）</div><div>' + unres.map(r => '<button class="wl unres" data-wl="' + esc(r) + '" style="font-size:15px;padding:4px 6px">' + esc(r) + '</button>').join(' ') + '</div>';
+  h += '<button class="btn wide" data-graph="' + esc(id) + '" style="margin-top:16px">🕸 この項目のつながりを見る</button>';
   $('enBody').innerHTML = h;
   openSheet('shEntry');
 }
@@ -444,7 +538,7 @@ async function setUnderstanding(k) {
 function openEntryEdit() {
   const e = entryById.get(viewId); if (!e) return;
   $('eeTerm').value = e.term; $('eeOne').value = e.oneLine || ''; $('eeTags').value = (e.tags || []).join(' ');
-  $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || '';
+  $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || ''; $('eeKind').value = e.kind || 'term';
   openSheet('shEntryEdit');
 }
 async function saveEntryEdit() {
@@ -452,7 +546,7 @@ async function saveEntryEdit() {
   const term = $('eeTerm').value.trim(); if (!term) { toast('見出し語を入れてください'); return; }
   const other = findEntryByTerm(term);
   if (other && other.id !== e.id) { toast('同じ見出し語の項目があります。名前を変えてください'); return; }
-  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), note: $('eeNote').value.trim(), updatedAt: Date.now() })]);
+  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), note: $('eeNote').value.trim(), kind: $('eeKind').value, updatedAt: Date.now() })]);
   closeSheet('shEntryEdit'); openEntry(viewId); refresh(); toast('保存しました');
 }
 async function deleteEntry() {
@@ -465,10 +559,10 @@ async function deleteEntry() {
 }
 
 /* ───────── Q&A を足す／直す ───────── */
-let editingQA = null, aiCand = null, aiRun = 0;
+let editingQA = null, aiCand = null, aiRun = 0, pendingVia = null;
 function clearQAForm() {
   ['qQuestion', 'qAnswer', 'qTerm', 'qOne', 'qJudgment', 'qTags', 'qRel', 'qUrl'].forEach(id => { $(id).value = ''; });
-  $('qSource').value = lsGet('kd_last_source') || 'chatgpt';
+  $('qSource').value = lsGet('kd_last_source') || 'chatgpt'; $('qKind').value = 'term'; pendingVia = null;
   $('simBox').innerHTML = ''; $('aiBox').innerHTML = ''; $('termNote').textContent = ''; aiCand = null; aiRun++;
   $('btnAI').disabled = false; $('btnAI').textContent = '✨ AI整理（候補を出す）';
 }
@@ -480,7 +574,7 @@ function openQAForm(opts) {
     editingQA = q.id; $('qaTitle').textContent = 'Q&Aを直す';
     $('qQuestion').value = q.question; $('qAnswer').value = q.answer; $('qJudgment').value = q.judgment || '';
     $('qSource').value = q.sourceType || 'other'; $('qUrl').value = q.sourceUrl || '';
-    $('qTerm').value = e.term; $('qOne').value = e.oneLine || ''; $('qTags').value = (e.tags || []).join(' '); $('qRel').value = (e.related || []).join(' ');
+    $('qTerm').value = e.term; $('qOne').value = e.oneLine || ''; $('qTags').value = (e.tags || []).join(' '); $('qRel').value = (e.related || []).join(' '); $('qKind').value = e.kind || 'term';
   } else if (opts.term) { $('qTerm').value = opts.term; onTermChange(); }
   updateTermNote(); openSheet('shQA');
 }
@@ -495,6 +589,7 @@ function onTermChange() {
     if (!$('qOne').value.trim()) $('qOne').value = e.oneLine || '';
     if (!$('qTags').value.trim()) $('qTags').value = (e.tags || []).join(' ');
     if (!$('qRel').value.trim()) $('qRel').value = (e.related || []).join(' ');
+    $('qKind').value = e.kind || 'term';
   }
   updateTermNote();
 }
@@ -536,9 +631,11 @@ async function saveQA() {
   const now = Date.now(), tags = splitList($('qTags').value), related = splitList($('qRel').value), one = $('qOne').value.trim();
   const old = editingQA ? qaById.get(editingQA) : null;
   let e = findEntryByTerm(term);
-  if (e) e = Object.assign({}, e, { oneLine: one || e.oneLine || '', tags: union(e.tags, tags), related: union(e.related, related), updatedAt: now });
-  else e = { id: uid(), term, oneLine: one, tags, related, note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
-  const q = { id: old ? old.id : uid(), entryId: e.id, question, answer, judgment: $('qJudgment').value.trim(), sourceType: $('qSource').value, sourceUrl: url, createdAt: old ? old.createdAt : now, updatedAt: now };
+  const kind = $('qKind').value;
+  if (e) e = Object.assign({}, e, { kind, oneLine: one || e.oneLine || '', tags: union(e.tags, tags), related: union(e.related, related), updatedAt: now });
+  else e = { id: uid(), term, kind, oneLine: one, tags, related, note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
+  const q = Object.assign({}, old || {}, { id: old ? old.id : uid(), entryId: e.id, question, answer, judgment: $('qJudgment').value.trim(), sourceType: $('qSource').value, sourceUrl: url, createdAt: old ? old.createdAt : now, updatedAt: now });
+  if (!old && pendingVia) { q.viaApp = true; q.model = pendingVia; }
   await writeEntries([e]); await writeQAs([q]);
   lsSet('kd_last_source', q.sourceType);
   closeSheet('shQA'); refresh();
@@ -568,18 +665,22 @@ function aiConfig() {
   };
 }
 const DEFAULT_MODEL = { gemini: 'gemini-3.5-flash-lite', openai: 'gpt-4o-mini', claude: 'claude-sonnet-4-6' };
-async function callAI(prompt) {
+async function callAI(prompt, opts) {
   const c = aiConfig();
   if (!c.endpoint || !c.token) throw new Error('AIの接続が未設定です（⚙︎ 設定 → AI整理の接続）');
   if (!/^[\x21-\x7e]+$/.test(c.token)) throw new Error('トークンに使えない文字が含まれています。入れ直してください');
+  const lim = dailyLimit(), used = usageToday();
+  if (lim && used.calls >= lim && !confirm('今日は ' + used.calls + '回 使いました（上限 ' + lim + '回）。トークンを使います。続けますか？')) throw new Error('今日の上限のため、やめました');
   const model = /^[A-Za-z0-9._-]{3,60}$/.test(c.model) ? c.model : DEFAULT_MODEL[c.provider];
   const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 90000);
   try {
-    const r = await fetch(c.endpoint + '/ai', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + c.token }, body: JSON.stringify({ provider: c.provider, model, maxTokens: c.provider === 'gemini' ? undefined : 700, prompt }) });
+    const r = await fetch(c.endpoint + '/ai', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + c.token }, body: JSON.stringify({ provider: c.provider, model, maxTokens: c.provider === 'gemini' ? undefined : ((opts && opts.maxTokens) || 700), prompt }) });
     if (r.status === 401) throw new Error('同期トークンが違います');
     if (!r.ok) throw new Error('AI中継がエラーを返しました（' + r.status + '）');
     const d = await r.json();
-    return d && typeof d.text === 'string' ? d.text : '';
+    const out = d && typeof d.text === 'string' ? d.text : '';
+    addUsage(String(prompt).length, out.length);
+    return out;
   } catch (e) {
     if (e && e.name === 'AbortError') throw new Error('時間切れです（90秒）。回線を確認してやり直してください');
     throw e;
@@ -704,6 +805,7 @@ async function renderSettings() {
   $('stStat').innerHTML = '項目 <b>' + entries.length + '</b>　Q&amp;A <b>' + qas.length + '</b><br><span class="note">最後のバックアップ：' + (last ? dstr(last) : 'まだありません') + esc(pers) + '</span>';
   const c = aiConfig();
   $('sEndpoint').value = lsGet('kd_endpoint'); $('sToken').value = ''; $('sProvider').value = c.provider; $('sModel').value = lsGet('kd_model');
+  $('sLimit').value = lsGet('kd_limit'); $('sSys').value = lsGet('kd_sys'); $('usageStat').textContent = usageLine();
   $('aiStat').textContent = (c.endpoint && c.token) ? '接続設定あり' + (lsGet('kd_endpoint') ? '' : '（quick-ref の設定を借りています）') : '未設定（AI整理を使わなければ、設定は不要です）';
 }
 function saveAI() {
@@ -712,6 +814,8 @@ function saveAI() {
   if (tk && !/^[\x21-\x7e]+$/.test(tk)) { toast('トークンに使えない文字が含まれています'); return; }
   lsSet('kd_endpoint', ep); if (tk) lsSet('kd_token', tk);
   lsSet('kd_provider', $('sProvider').value); lsSet('kd_model', $('sModel').value.trim());
+  const lm = $('sLimit').value.trim(); lsSet('kd_limit', lm === '' ? '' : String(Math.max(0, Math.min(500, Math.floor(Number(lm) || 0)))));
+  lsSet('kd_sys', $('sSys').value.trim().slice(0, 200));
   renderSettings(); toast('保存しました');
 }
 async function testAI() {
@@ -720,31 +824,218 @@ async function testAI() {
   catch (e) { toast('失敗：' + ((e && e.message) || e).slice(0, 80)); }
 }
 
+/* ───────── 使用量・上限（トークン＝お金の目安） ───────── */
+const todayStr = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+function usageToday() { let u = {}; try { u = JSON.parse(lsGet('kd_usage') || '{}') || {}; } catch (_) {} return u.d === todayStr() ? u : { d: todayStr(), calls: 0, inC: 0, outC: 0 }; }
+function addUsage(inC, outC) { const u = usageToday(); u.calls++; u.inC += inC; u.outC += outC; lsSet('kd_usage', JSON.stringify(u)); }
+const dailyLimit = () => { const v = lsGet('kd_limit'); return v === '' ? 30 : Math.max(0, Number(v) || 0); };
+const usageLine = () => { const u = usageToday(), lim = dailyLimit(); return '今日：' + u.calls + '回' + (lim ? '／上限 ' + lim + '回' : '（上限なし）') + '　送信 約' + u.inC + '字・受信 約' + u.outC + '字（日本語は1文字が約1〜2トークンの目安）'; };
+const sysText = () => (lsGet('kd_sys') || '日本語で、結論から簡潔に答えてください。').trim();
+const modelName = () => { const c = aiConfig(); return /^[A-Za-z0-9._-]{3,60}$/.test(c.model) ? c.model : DEFAULT_MODEL[c.provider]; };
+
+/* ───────── AIに聞く（直接質問して、そのまま蓄積） ───────── */
+let askAnswer = '', askBusy = false, askRun = 0, askCtxIds = [];
+function openAsk() {
+  $('aQ').value = ''; $('aOut').innerHTML = ''; askAnswer = ''; askCtxIds = []; askRun++; askBusy = false;
+  $('btnAskGo').disabled = false; $('btnAskGo').textContent = '🤖 AIに聞く';
+  updateAskCtx(); updateAskMeta(); openSheet('shAsk');
+}
+function askCtxText() {
+  const parts = askCtxIds.map(id => entryById.get(id)).filter(Boolean).map(e => {
+    const q0 = (qasByEntry.get(e.id) || []).find(q => q.judgment);
+    return '■ ' + e.term + (e.oneLine ? '：' + e.oneLine : '') + (e.note ? '\n自分の理解：' + e.note.slice(0, 300) : '') + (q0 ? '\n自分の判断：' + q0.judgment.slice(0, 200) : '');
+  });
+  return parts.length ? '【参考：以前の自分の整理】\n' + parts.join('\n\n') : '';
+}
+function updateAskMeta() {
+  const c = aiConfig(), ctx = askCtxText();
+  $('aMeta').innerHTML = (c.endpoint && c.token)
+    ? 'AI：' + esc(c.provider) + '（' + esc(modelName()) + '）<br>今回の送信：約' + ($('aQ').value.length + ctx.length + sysText().length) + '字<br>' + esc(usageLine())
+    : '⚠️ AIの接続が未設定です。 <button class="btn sm" data-act="settings">⚙︎ 設定を開く</button>';
+}
+let askTimer = 0;
+function updateAskCtx() {
+  clearTimeout(askTimer);
+  askTimer = setTimeout(() => {
+    const ids = [...new Set([...askCtxIds, ...findSimilar($('aQ').value).map(x => x.e.id)])].slice(0, 5);
+    $('aCtx').innerHTML = ids.length ? '<div class="sec-h">過去の項目を材料にする（チェックした分だけ、送る文字が増えます）</div>' + ids.map(id => {
+      const e = entryById.get(id); if (!e) return '';
+      return '<label class="ctx"><input type="checkbox" data-ctx="' + esc(id) + '"' + (askCtxIds.includes(id) ? ' checked' : '') + '><span><b>' + esc(e.term) + '</b>' + (e.oneLine ? '<br><span class="note">' + esc(e.oneLine) + '</span>' : '') + '</span></label>';
+    }).join('') + '<div class="note">1つだけチェックすると、答えはその項目に足されます。</div>' : '';
+    updateAskMeta();
+  }, 250);
+}
+async function runAsk() {
+  if (askBusy) return;
+  const q = $('aQ').value.trim(); if (!q) { toast('質問を入れてください'); return; }
+  const ctx = askCtxText(), full = redact(sysText() + '\n\n' + (ctx ? ctx + '\n\n' : '') + '【質問】\n' + q);
+  if (full.removed && !confirm('秘密らしい行が' + full.removed + '行あります。その行は除いて送ります。続けますか？')) return;
+  const run = ++askRun; askBusy = true; $('btnAskGo').disabled = true; $('btnAskGo').textContent = '🤖 考え中…（最大90秒）'; $('aOut').innerHTML = '';
+  let ans = '', err = '';
+  try { ans = (await callAI(full.text, { maxTokens: 1200 })).trim(); if (!ans) err = 'AIの返事が空でした'; } catch (e) { err = (e && e.message) || String(e); }
+  if (run !== askRun) return;
+  askBusy = false; $('btnAskGo').disabled = false; $('btnAskGo').textContent = '🤖 もう一度聞く';
+  updateAskMeta();
+  if (err) { $('aOut').innerHTML = '<div class="banner">' + esc(err) + '</div>'; return; }
+  askAnswer = ans; drawAskOut();
+}
+function askTarget() { return askCtxIds.length === 1 ? entryById.get(askCtxIds[0]) : null; }
+function drawAskOut() {
+  const tgt = askTarget();
+  $('aOut').innerHTML = '<div class="box" style="margin-top:14px"><div class="lab">AIの回答</div><div>' + escBr(askAnswer) + '</div></div>' +
+    '<div class="row"><button class="btn pri" data-ask="save">💾 そのまま保存</button><button class="btn" data-ask="form">✏️ 整理して保存</button></div>' +
+    '<div class="row" style="margin-top:8px"><button class="btn sm" data-ask="copy">📋 回答をコピー</button></div>' +
+    '<div class="note">「そのまま保存」は、' + (tgt ? '「' + esc(tgt.term) + '」に足します。' : '質問の1行目を見出し語にして、新しい項目を作ります。') + 'あとから項目の「編集」で直せます。「整理して保存」は、見出し語・タグなどを決めてから保存します（✨AI整理も使えます）。</div>';
+}
+async function saveAskDirect() {
+  const q = $('aQ').value.trim(); if (!q || !askAnswer) return;
+  const tgt = askTarget(), now = Date.now(), c = aiConfig();
+  const term = tgt ? tgt.term : firstLine(q).slice(0, 30);
+  let e = findEntryByTerm(term);
+  if (e) e = Object.assign({}, e, { updatedAt: now });
+  else e = { id: uid(), term, kind: 'term', oneLine: '', tags: [], related: [], note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
+  await writeEntries([e]);
+  await writeQAs([{ id: uid(), entryId: e.id, question: q, answer: askAnswer, judgment: '', sourceType: c.provider, sourceUrl: '', viaApp: true, model: modelName(), createdAt: now, updatedAt: now }]);
+  closeSheet('shAsk'); refresh(); toast('保存しました'); openEntry(e.id);
+}
+function askToForm() {
+  const tgt = askTarget(), q = $('aQ').value.trim(), a = askAnswer, c = aiConfig();
+  closeSheet('shAsk'); openQAForm(tgt ? { term: tgt.term } : {});
+  $('qQuestion').value = q; $('qAnswer').value = a; $('qSource').value = c.provider; pendingVia = modelName(); updateSim();
+}
+
+/* ───────── リンクを入れる／項目を作る ───────── */
+let pickTarget = null;
+function openPicker(targetId) { pickTarget = targetId; $('pkQ').value = ''; drawPicker(); openSheet('shPick'); }
+function drawPicker() {
+  const q = $('pkQ').value.trim();
+  const list = (tokensOf(q).length ? searchEntries(q, 'all', 'all') : entries.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))).slice(0, 40);
+  let h = q && !findEntryByTerm(q) ? '<div class="pick-item" data-pk="' + esc(q) + '">＋ <b>[[' + esc(q) + ']]</b> を入れる（項目は、あとで作れます）</div>' : '';
+  h += list.map(e => '<div class="pick-item" data-pk="' + esc(e.term) + '"><b>' + esc(e.term) + '</b>' + (e.oneLine ? '<div class="note">' + esc(e.oneLine) + '</div>' : '') + '</div>').join('');
+  $('pkList').innerHTML = h || '<div class="empty">項目がまだありません。上の欄に語を書くと、その語のリンクを入れられます。</div>';
+}
+function insertLink(term) {
+  const el = $(pickTarget), t = String(term).replace(/[\[\]|]/g, '').trim(); if (!el || !t) return;
+  const s0 = el.selectionStart == null ? el.value.length : el.selectionStart, e0 = el.selectionEnd == null ? s0 : el.selectionEnd, ins = '[[' + t + ']]';
+  el.value = el.value.slice(0, s0) + ins + el.value.slice(e0);
+  try { el.setSelectionRange(s0 + ins.length, s0 + ins.length); } catch (_) {}
+  closeSheet('shPick'); toast('リンクを入れました');
+}
+async function openOrCreateTerm(term) {
+  term = String(term || '').trim(); if (!term) return;
+  let e = findEntryByTerm(term);
+  if (!e) {
+    if (!confirm('「' + term + '」の項目はまだありません。作りますか？（あとからQ&Aや自分の理解を足せます）')) return;
+    const now = Date.now(); e = { id: uid(), term, kind: 'term', oneLine: '', tags: [], related: [], note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
+    await writeEntries([e]); refresh();
+  }
+  openEntry(e.id);
+}
+
+/* ───────── つながり図（リンク・関連用語から） ───────── */
+let grCenter = null;
+function buildGraph(center) {
+  const termId = new Map(entries.map(e => [norm(e.term), e.id])), edges = [], seen = new Set();
+  for (const e of entries) for (const n of (outLinks.get(e.id) || new Map()).keys()) {
+    const t = termId.get(n); if (!t || t === e.id) continue;
+    const k = e.id < t ? e.id + '|' + t : t + '|' + e.id; if (!seen.has(k)) { seen.add(k); edges.push([e.id, t]); }
+  }
+  let nodes;
+  if (center) {
+    const adj = new Map(); const link = (a, b) => { if (!adj.has(a)) adj.set(a, []); adj.get(a).push(b); };
+    edges.forEach(([a, b]) => { link(a, b); link(b, a); });
+    const dist = new Map([[center, 0]]), queue = [center];
+    while (queue.length) { const x = queue.shift(), d = dist.get(x); if (d >= 2) continue; for (const y of adj.get(x) || []) if (!dist.has(y)) { dist.set(y, d + 1); queue.push(y); } }
+    nodes = [...dist.keys()];
+  } else {
+    const deg = new Map(); edges.forEach(([a, b]) => { deg.set(a, (deg.get(a) || 0) + 1); deg.set(b, (deg.get(b) || 0) + 1); });
+    nodes = [...deg.keys()].sort((a, b) => deg.get(b) - deg.get(a)).slice(0, 120);
+  }
+  const ns = new Set(nodes);
+  return { nodes, edges: edges.filter(([a, b]) => ns.has(a) && ns.has(b)) };
+}
+function layoutGraph(nodes, edges, W, H) {
+  const n = nodes.length, pos = new Map(nodes.map((id, i) => { const a = i / n * 6.2832; return [id, { x: W / 2 + Math.cos(a) * W * 0.3, y: H / 2 + Math.sin(a) * H * 0.3, vx: 0, vy: 0 }]; }));
+  const k = Math.sqrt(W * H / Math.max(n, 1)) * 0.6;
+  for (let it = 0; it < 260; it++) {
+    const cool = 1 - it / 260;
+    for (let i = 0; i < n; i++) { const a = pos.get(nodes[i]); for (let j = i + 1; j < n; j++) { const b = pos.get(nodes[j]); let dx = a.x - b.x, dy = a.y - b.y; const d2 = dx * dx + dy * dy + 0.01, d = Math.sqrt(d2), f = k * k / d2; dx /= d; dy /= d; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f; } }
+    for (const [x, y] of edges) { const a = pos.get(x), b = pos.get(y); let dx = b.x - a.x, dy = b.y - a.y; const d = Math.sqrt(dx * dx + dy * dy) + 0.01, f = (d - k) * 0.08; dx /= d; dy /= d; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f; }
+    for (const p of pos.values()) {
+      p.vx += (W / 2 - p.x) * 0.01; p.vy += (H / 2 - p.y) * 0.01;
+      const m = Math.hypot(p.vx, p.vy) || 1, sc = Math.min(m, 12 * cool + 1) / m;
+      p.x = Math.max(28, Math.min(W - 28, p.x + p.vx * sc)); p.y = Math.max(28, Math.min(H - 28, p.y + p.vy * sc)); p.vx = 0; p.vy = 0;
+    }
+  }
+  return pos;
+}
+function drawGraph() {
+  const W = 360, H = 520, g = buildGraph(grCenter), c = grCenter && entryById.get(grCenter);
+  $('grTitle').textContent = c ? '「' + c.term.slice(0, 12) + '」の周辺' : 'つながり';
+  $('grMode').classList.toggle('hidden', !c);
+  if (!g.edges.length) {
+    $('grNote').textContent = ''; $('grBox').innerHTML = '<div class="empty">まだリンクがありません。<br><span style="font-size:13px">自分の理解や回答に <b>[[見出し語]]</b> と書くか、関連用語を入れると、ここにつながりが出ます。</span></div>'; return;
+  }
+  const pos = layoutGraph(g.nodes, g.edges, W, H);
+  const deg = new Map(); g.edges.forEach(([a, b]) => { deg.set(a, (deg.get(a) || 0) + 1); deg.set(b, (deg.get(b) || 0) + 1); });
+  const col = { unknown: 'var(--unk)', learning: 'var(--lrn)', known: 'var(--knw)' };
+  $('grNote').textContent = '項目 ' + g.nodes.length + '・つながり ' + g.edges.length + '。丸を押すと開きます。色は理解度（赤＝未理解・橙＝理解中・緑＝理解済）。' + (c ? '' : '（つながりのある項目だけ表示）');
+  $('grBox').innerHTML = '<svg id="gsvg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="項目のつながり図">' +
+    g.edges.map(([a, b]) => '<line x1="' + pos.get(a).x.toFixed(1) + '" y1="' + pos.get(a).y.toFixed(1) + '" x2="' + pos.get(b).x.toFixed(1) + '" y2="' + pos.get(b).y.toFixed(1) + '" style="stroke:var(--sub);stroke-opacity:.45;stroke-width:1.2"/>').join('') +
+    g.nodes.map(id => {
+      const e = entryById.get(id), p = pos.get(id), r = 6 + Math.min(deg.get(id) || 0, 6) * 1.5;
+      return '<g data-gn="' + esc(id) + '" style="cursor:pointer"><circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + r + '" style="fill:' + col[e.understanding || 'unknown'] + ';stroke:' + (id === grCenter ? 'var(--text)' : 'var(--card)') + ';stroke-width:' + (id === grCenter ? 3 : 1.5) + '"/><text x="' + p.x.toFixed(1) + '" y="' + (p.y + r + 11).toFixed(1) + '" text-anchor="middle">' + esc(e.term.slice(0, 9)) + '</text></g>';
+    }).join('') + '</svg>';
+}
+function openGraph(center) { grCenter = center || null; drawGraph(); openSheet('shGraph'); }
+
 /* ───────── 配線 ───────── */
 function wire() {
   $('q').addEventListener('input', e => { searchQuery = e.target.value; renderList(); });
   $('btnClear').addEventListener('click', () => { $('q').value = ''; searchQuery = ''; renderList(); $('q').focus(); });
-  $('fchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filterUnd = b.dataset.f; document.querySelectorAll('.fchip').forEach(x => x.classList.toggle('on', x === b)); renderList(); });
+  $('fchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filterUnd = b.dataset.f; document.querySelectorAll('#fchips .fchip').forEach(x => x.classList.toggle('on', x === b)); renderList(); });
   $('btnAdd').addEventListener('click', () => openQAForm());
   $('btnSettings').addEventListener('click', () => { renderSettings(); openSheet('shSet'); });
   document.body.addEventListener('click', e => {
     const a = e.target.closest('[data-act]');
     if (a && a.dataset.act === 'add') { openQAForm(); return; }
     if (a && a.dataset.act === 'settings') { renderSettings(); openSheet('shSet'); return; }
+    if (a && a.dataset.act === 'ask') { openAsk(); return; }
+    const lp = e.target.closest('[data-linkpick]'); if (lp) { openPicker(lp.dataset.linkpick); return; }
   });
+  $('btnAsk').addEventListener('click', openAsk);
+  $('btnGraph').addEventListener('click', () => openGraph(null));
+  $('kchips').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; filterKind = b.dataset.k; document.querySelectorAll('#kchips .fchip').forEach(x => x.classList.toggle('on', x === b)); renderList(); });
+  $('askClose').addEventListener('click', () => { askRun++; askBusy = false; closeSheet('shAsk'); });
+  $('btnAskGo').addEventListener('click', () => { void runAsk(); });
+  $('aQ').addEventListener('input', updateAskCtx);
+  $('aCtx').addEventListener('change', e => { const cb = e.target.closest('[data-ctx]'); if (!cb) return; const id = cb.dataset.ctx; askCtxIds = cb.checked ? [...new Set([...askCtxIds, id])] : askCtxIds.filter(x => x !== id); updateAskMeta(); if (askAnswer) drawAskOut(); });
+  $('aOut').addEventListener('click', async e => {
+    const b = e.target.closest('[data-ask]'); if (!b) return;
+    if (b.dataset.ask === 'save') await saveAskDirect(); else if (b.dataset.ask === 'form') askToForm(); else if (b.dataset.ask === 'copy') await copyText(askAnswer, '回答をコピーしました');
+  });
+  $('shAsk').addEventListener('click', e => { const a = e.target.closest('[data-act="settings"]'); if (a) { renderSettings(); openSheet('shSet'); } });
+  $('pkClose').addEventListener('click', () => closeSheet('shPick'));
+  $('pkQ').addEventListener('input', drawPicker);
+  $('pkList').addEventListener('click', e => { const it = e.target.closest('[data-pk]'); if (it) insertLink(it.dataset.pk); });
+  $('grClose').addEventListener('click', () => closeSheet('shGraph'));
+  $('grMode').addEventListener('click', () => openGraph(null));
+  $('grBox').addEventListener('click', e => { const g = e.target.closest('[data-gn]'); if (g) openEntry(g.dataset.gn); });
   $('list').addEventListener('click', e => { const c = e.target.closest('[data-open]'); if (c) openEntry(c.dataset.open); });
   $('enClose').addEventListener('click', () => { closeSheet('shEntry'); viewId = null; });
   $('enEdit').addEventListener('click', openEntryEdit);
   $('enBody').addEventListener('click', async e => {
-    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open]'); if (!t) return;
+    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open],[data-wl],[data-graph]'); if (!t) return;
     const d = t.dataset;
     if (d.und) await setUnderstanding(d.und);
-    else if (d.search) { closeSheet('shEntry'); viewId = null; $('q').value = d.search; searchQuery = d.search; filterUnd = 'all'; document.querySelectorAll('.fchip').forEach(x => x.classList.toggle('on', x.dataset.f === 'all')); renderList(); }
+    else if (d.search) { closeSheet('shEntry'); viewId = null; $('q').value = d.search; searchQuery = d.search; filterUnd = 'all'; document.querySelectorAll('#fchips .fchip').forEach(x => x.classList.toggle('on', x.dataset.f === 'all')); renderList(); }
     else if (d.rel) { const r = findEntryByTerm(d.rel); if (r) openEntry(r.id); else { closeSheet('shEntry'); viewId = null; $('q').value = d.rel; searchQuery = d.rel; renderList(); } }
     else if (d.copy) { const q = qaById.get(d.qa), en = q && entryById.get(q.entryId); if (q && en) await copyText(d.copy === 'a' ? q.answer : qaAskText(en, q), d.copy === 'a' ? '回答をコピーしました' : '再質問用の文をコピーしました。AIに貼って、続きを書いてください'); }
     else if (d.qaedit) openQAForm({ qaId: d.qaedit });
     else if (d.qadel) await deleteQA(d.qadel);
     else if (d.addto) { const en = entryById.get(d.addto); if (en) openQAForm({ term: en.term }); }
+    else if (d.wl) await openOrCreateTerm(d.wl);
+    else if (d.graph) openGraph(d.graph);
     else if (d.open) openEntry(d.open);
   });
   $('eeCancel').addEventListener('click', () => closeSheet('shEntryEdit'));

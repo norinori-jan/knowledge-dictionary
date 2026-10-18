@@ -18,6 +18,9 @@ AIに聞いたことを貼り付けて残し、**キーワード1つで「あの
 | 分からないことを見返す | 未理解／理解中／理解済で絞り込む |
 | AIに続きを聞く | 「再質問用にコピー」で、過去のやり取りを材料にした文を作る |
 | 整理を任せる（任意） | ✨AI整理で、見出し語・一言・タグ・関連用語の**候補**を出す |
+| AIに直接聞いて、そのまま残す | 「🤖 AIに聞く」（APIトークンを使う。月額プランとは別枠。1日の上限と使用量を表示） |
+| 手順・考え方をつなぐ | 本文に `[[見出し語]]` と書くと、項目どうしがリンク（被リンク・つながり図つき。Obsidian風） |
+| 項目の種類 | 用語／手順／考え方 で分けて絞り込める |
 | quick-ref から移す | 設定から、quick-ref の書き出しJSONを取り込む |
 
 詳しくは [docs/USAGE.md](docs/USAGE.md)、設計は [docs/DESIGN.md](docs/DESIGN.md)。
@@ -35,7 +38,7 @@ AIに聞いたことを貼り付けて残し、**キーワード1つで「あの
 cd C:\Users\norin\knowledge-dictionary
 git init -b main
 git add .
-git commit -m "feat: 知識辞書 v0.1"
+git commit -m "feat: 知識辞書 v0.2"
 gh repo create norinori-jan/knowledge-dictionary --public --source . --push
 gh api -X POST repos/norinori-jan/knowledge-dictionary/pages -f "source[branch]=main" -f "source[path]=/"
 ```
@@ -54,7 +57,11 @@ python -m http.server 8000
 
 ブラウザで `http://localhost:8000/` を開きます。（`file://` で直接開くと、オフライン用の機能だけが動きません）
 
-## できないこと（v0.1）
+## 費用について（AIに聞く）
+
+「AIに聞く」は、Worker 経由で **API のトークン**を使います。ChatGPT・Claude の月額プランとは別の、使った分だけの課金です。設定で1日の上限（初期30回）を決められ、超えると確認が出ます。Gemini が安価でおすすめです。
+
+## できないこと（v0.2）
 
 - **端末どうしの自動同期はありません。** 移すときは「書き出す」→「読み込む」を使います
 - **暗号化（保護）には未対応**です。秘密が混ざる回答は貼らないでください
