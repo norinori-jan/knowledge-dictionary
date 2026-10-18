@@ -234,6 +234,14 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
       <div class="note">データは、この端末のこのアプリの中にだけ保存されます。消えないよう、ときどき「書き出す」でバックアップしてください（ファイルアプリやiCloud Driveに保存）。</div>
     </div>
     <div class="box">
+      <div class="lab">端末どうしの同期（PC ⇔ iPhone）</div>
+      <div id="syncStat" style="font-size:15px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="btnSync">🔄 今すぐ同期</button>
+      </div>
+      <div class="note">下の「AIの接続」と同じ エンドポイント・同期トークン を、<b>両方の端末</b>に入れてください。最初に「今すぐ同期」を押すと、以後は保存のたびに自動で同期します。削除も反映されます。</div>
+    </div>
+    <div class="box">
       <div class="lab">quick-ref から取り込む</div>
       <button class="btn wide" id="btnImportQR">📥 quick-ref の書き出しJSONを選ぶ</button>
       <div class="note">quick-ref の「JSONエクスポート」で作ったファイルを選びます。「AI Q&amp;A」のメモだけを取り込みます（保護メモ・ふつうのメモは取り込みません）。同じファイルを何度選んでも、重複しません。</div>
@@ -269,7 +277,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
 
 <script>
 'use strict';
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -373,6 +381,7 @@ async function writeQAs(list) {
 let persistAsked = false;
 function afterWrite() {
   if (!persistAsked && navigator.storage && navigator.storage.persist) { persistAsked = true; navigator.storage.persist().catch(() => {}); }
+  scheduleSync();
 }
 const findEntryByTerm = term => { const n = norm(term); return n ? entries.find(e => norm(e.term) === n) : null; };
 const splitList = s => [...new Set(String(s || '').split(/[,、，\s#＃]+/).map(x => x.trim().slice(0, 30)).filter(Boolean))].slice(0, 12);
@@ -554,6 +563,7 @@ async function deleteEntry() {
   const ids = (qasByEntry.get(e.id) || []).map(q => q.id);
   if (!confirm('「' + e.term + '」と、Q&A ' + ids.length + '件を削除します。元に戻せません。よろしいですか？')) return;
   entries = entries.filter(x => x.id !== e.id); qas = qas.filter(q => q.entryId !== e.id); rebuild();
+  addTomb([e.id].concat(ids));
   await idbDel('entries', [e.id]); await idbDel('qas', ids);
   closeSheet('shEntryEdit'); closeSheet('shEntry'); viewId = null; refresh(); toast('削除しました');
 }
@@ -645,7 +655,7 @@ async function saveQA() {
 async function deleteQA(id) {
   const q = qaById.get(id); if (!q) return;
   if (!confirm('このQ&Aを削除します。元に戻せません。よろしいですか？')) return;
-  qas = qas.filter(x => x.id !== id); rebuild(); await idbDel('qas', [id]);
+  qas = qas.filter(x => x.id !== id); rebuild(); addTomb([id]); await idbDel('qas', [id]);
   refresh(); if (viewId) openEntry(viewId); toast('削除しました');
 }
 
@@ -797,12 +807,104 @@ async function importQuickRef(file) {
   toast('取り込み ' + added + '件／すでにあった ' + dup + '件／対象外 ' + skipped + '件');
 }
 
+
+/* ───────── 端末どうしの同期（Worker の /sync/knowledge-dictionary） ───────── */
+function getTombs() { try { return JSON.parse(lsGet('kd_tomb') || '{}') || {}; } catch (_) { return {}; } }
+function setTombs(t) { lsSet('kd_tomb', JSON.stringify(t)); }
+function addTomb(ids) { const t = getTombs(), now = Date.now(); ids.forEach(i => { t[i] = now; }); setTombs(t); scheduleSync(); }
+let syncBusy = false, syncTimer = null, syncMsg = '';
+function syncReady() { const c = aiConfig(); return !!(c.endpoint && c.token); }
+function scheduleSync() {
+  if (lsGet('kd_sync') !== '1' || !syncReady()) return;
+  clearTimeout(syncTimer); syncTimer = setTimeout(() => { void kdSync(false); }, 2500);
+}
+function mergeRemote(remote) {
+  // 戻り値：{changed(クラウドに送る必要あり), recv(この端末が受けた件数)}
+  const now = Date.now(), DAY90 = 90 * 86400000;
+  const rE = Array.isArray(remote.entries) ? remote.entries : [], rQ = Array.isArray(remote.qas) ? remote.qas : [];
+  const tombs = getTombs(), rT = remote.tombs && typeof remote.tombs === 'object' ? remote.tombs : {};
+  let changed = false, recv = 0;
+  for (const k of Object.keys(rT)) { if ((rT[k] || 0) > (tombs[k] || 0)) tombs[k] = rT[k]; }
+  for (const k of Object.keys(tombs)) { if (now - tombs[k] > DAY90) delete tombs[k]; }
+  for (const k of Object.keys(tombs)) { if (!(k in rT) || rT[k] < tombs[k]) changed = true; }
+  const em = new Map(entries.map(e => [e.id, e])), qm = new Map(qas.map(q => [q.id, q]));
+  const take = (m, x) => { const cur = m.get(x.id); if (!cur) { m.set(x.id, x); recv++; } else if ((x.updatedAt || 0) > (cur.updatedAt || 0)) { m.set(x.id, x); recv++; } else if ((cur.updatedAt || 0) > (x.updatedAt || 0)) changed = true; };
+  rE.forEach(e => { if (e && e.id && e.term) take(em, e); });
+  rQ.forEach(q => { if (q && q.id && q.entryId) take(qm, q); });
+  const rEid = new Set(rE.map(e => e && e.id)), rQid = new Set(rQ.map(q => q && q.id));
+  for (const id of em.keys()) if (!rEid.has(id)) changed = true;
+  for (const id of qm.keys()) if (!rQid.has(id)) changed = true;
+  // 削除の反映
+  for (const [id, e] of [...em]) if (tombs[id] && tombs[id] >= (e.updatedAt || 0)) em.delete(id);
+  for (const [id, q] of [...qm]) if (tombs[id] && tombs[id] >= (q.updatedAt || 0)) qm.delete(id);
+  // 同じ見出し語が2端末で別々に作られたとき、1つにまとめる
+  const byTerm = new Map();
+  for (const e of em.values()) { const n = norm(e.term); if (!byTerm.has(n)) byTerm.set(n, []); byTerm.get(n).push(e); }
+  for (const grp of byTerm.values()) {
+    if (grp.length < 2) continue;
+    grp.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    const keep = Object.assign({}, grp[0]);
+    for (const o of grp.slice(1)) {
+      keep.tags = union(keep.tags, o.tags); keep.related = union(keep.related, o.related);
+      if (!keep.oneLine) keep.oneLine = o.oneLine || '';
+      if (o.note && o.note !== keep.note) keep.note = keep.note ? keep.note + '\n' + o.note : o.note;
+      for (const q of qm.values()) if (q.entryId === o.id) qm.set(q.id, Object.assign({}, q, { entryId: keep.id, updatedAt: now }));
+      em.delete(o.id); tombs[o.id] = now;
+    }
+    keep.updatedAt = now; em.set(keep.id, keep); changed = true;
+  }
+  // 項目のないQ&Aは持たない
+  for (const [id, q] of [...qm]) if (!em.has(q.entryId)) qm.delete(id);
+  setTombs(tombs);
+  return { em, qm, tombs, changed, recv };
+}
+async function kdSync(show) {
+  if (syncBusy) return false;
+  const c = aiConfig(), url = c.endpoint + '/sync/knowledge-dictionary';
+  if (!c.endpoint || !c.token) { if (show) toast('先に「AIの接続」のエンドポイントとトークンを入れてください'); return false; }
+  if (memOnly) { if (show) toast('この環境では保存できないため同期しません'); return false; }
+  syncBusy = true; if (show) toast('同期中…');
+  const hdr = { Authorization: 'Bearer ' + c.token };
+  const ctl = ms => { const a = new AbortController(); setTimeout(() => a.abort(), ms); return a.signal; };
+  try {
+    const r = await fetch(url, { headers: hdr, signal: ctl(30000) });
+    let remote = {};
+    if (r.status === 404) remote = {};
+    else if (r.status === 401 || r.status === 403) throw new Error('トークンが違います（' + r.status + '）');
+    else if (!r.ok) throw new Error('受信失敗（' + r.status + '）');
+    else { const j = await r.json(); remote = (j && j.data) || {}; }
+    const m = mergeRemote(remote);
+    const oldE = new Set(entries.map(e => e.id)), oldQ = new Set(qas.map(q => q.id));
+    entries = [...m.em.values()]; qas = [...m.qm.values()]; rebuild();
+    await idbPutMany('entries', entries); await idbPutMany('qas', qas);
+    await idbDel('entries', [...oldE].filter(i => !m.em.has(i))); await idbDel('qas', [...oldQ].filter(i => !m.qm.has(i)));
+    const first = r.status === 404;
+    if (m.changed || first) {
+      const body = JSON.stringify({ data: { app: 'knowledge-dictionary', version: 1, entries, qas, tombs: m.tombs } });
+      const w = await fetch(url, { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, hdr), body, signal: ctl(45000) });
+      if (!w.ok) throw new Error(w.status === 404 || w.status === 400 ? '送信失敗（' + w.status + '）：Worker がこの名前を受け付けません。sync-worker に knowledge-dictionary の置き場を足す必要があります' : '送信失敗（' + w.status + '）');
+    }
+    lsSet('kd_sync', '1'); lsSet('kd_last_sync', String(Date.now()));
+    syncMsg = '最終同期 ' + dstr(Date.now()) + '（受信 ' + m.recv + '件）';
+    refresh(); renderSettings(); if (viewId && entryById.get(viewId)) { try { openEntry(viewId); } catch (_) {} }
+    if (show) toast('同期できました：項目 ' + entries.length + '・Q&A ' + qas.length);
+    return true;
+  } catch (e) {
+    const msg = e && e.name === 'AbortError' ? '時間切れ（回線が遅い）' : ((e && e.message) || String(e));
+    syncMsg = '同期できませんでした：' + msg; renderSettings();
+    if (show) toast(syncMsg.slice(0, 90));
+    return false;
+  } finally { syncBusy = false; }
+}
+
 /* ───────── 設定 ───────── */
 async function renderSettings() {
   const last = Number(lsGet('kd_last_backup')) || 0;
   let pers = '';
   try { if (navigator.storage && navigator.storage.persisted) pers = (await navigator.storage.persisted()) ? '　／　端末による自動削除：されにくい設定' : '　／　端末による自動削除：される可能性あり（バックアップ推奨）'; } catch (_) {}
   $('stStat').innerHTML = '項目 <b>' + entries.length + '</b>　Q&amp;A <b>' + qas.length + '</b><br><span class="note">最後のバックアップ：' + (last ? dstr(last) : 'まだありません') + esc(pers) + '</span>';
+  const lastS = Number(lsGet('kd_last_sync')) || 0;
+  $('syncStat').innerHTML = syncReady() ? (lsGet('kd_sync') === '1' ? '自動同期：オン' : '自動同期：オフ（「今すぐ同期」で開始）') + '<br><span class="note">' + esc(syncMsg || (lastS ? '最終同期 ' + dstr(lastS) : 'まだ同期していません')) + '</span>' : '<span class="note">未設定：下の「AIの接続」にエンドポイントとトークンを入れてください</span>';
   const c = aiConfig();
   $('sEndpoint').value = lsGet('kd_endpoint'); $('sToken').value = ''; $('sProvider').value = c.provider; $('sModel').value = lsGet('kd_model');
   $('sLimit').value = lsGet('kd_limit'); $('sSys').value = lsGet('kd_sys'); $('usageStat').textContent = usageLine();
@@ -1063,6 +1165,8 @@ function wire() {
   $('btnImportQR').addEventListener('click', () => $('fileQR').click());
   $('fileOwn').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importOwn(f); });
   $('fileQR').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importQuickRef(f); });
+  $('btnSync').addEventListener('click', () => { void kdSync(true); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && lsGet('kd_sync') === '1' && syncReady()) void kdSync(false); });
   $('btnSaveAI').addEventListener('click', saveAI);
   $('btnTestAI').addEventListener('click', () => { void testAI(); });
 }
@@ -1073,6 +1177,7 @@ async function init() {
   try { db = await openDB(); entries = await idbAll('entries'); qas = await idbAll('qas'); }
   catch (e) { memOnly = true; db = null; entries = []; qas = []; }
   rebuild(); refresh();
+  if (lsGet('kd_sync') === '1' && syncReady()) void kdSync(false);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 init();
