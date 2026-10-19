@@ -111,6 +111,9 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
 .rich code,code.kc{background:var(--bg);border:1px solid var(--line);padding:0 5px;border-radius:4px;font-size:.92em;word-break:break-all}
 .tag.lk{cursor:pointer}
 .auto-note{font-size:12px;color:var(--sub);margin-top:2px}
+.br-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+.br-src{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.vd-ok{color:var(--knw);font-weight:800}.vd-partial{color:var(--lrn);font-weight:800}.vd-ng{color:var(--unk);font-weight:800}
 </style>
 </head>
 <body>
@@ -118,6 +121,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
   <div class="top">
     <div class="top-row">
       <div class="title">📖 知識辞書</div>
+      <button class="icon-btn" id="btnBrain" aria-label="辞書AI">🧠</button>
       <button class="icon-btn" id="btnGraph" aria-label="つながり">🕸</button>
       <button class="icon-btn" id="btnSettings" aria-label="設定とバックアップ">⚙︎</button>
     </div>
@@ -199,6 +203,31 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
   </div>
 </div>
 
+<!-- 辞書AI -->
+<div class="sheet" id="shBrain">
+  <div class="sh-head"><button id="brClose">閉じる</button><h2>🧠 辞書AI</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <div class="banner" style="margin-top:0">💳 ここのAIは、APIのトークンを使います（月額プランとは別枠）。<span id="brMeta"></span></div>
+    <div class="box">
+      <div class="lab">辞書に聞く（自分の辞書だけを根拠に答える）</div>
+      <textarea id="bQ" rows="3" placeholder="例：認証まわりで、自分はこれまで何を決めた？"></textarea>
+      <button class="btn pri wide" id="btnBrainAsk" style="margin-top:8px">🧠 辞書に聞く</button>
+      <div class="note">質問に関係する項目・Q&amp;A・自分の判断を探して、それを材料にAIが答えます。根拠の項目は[[リンク]]で示します。関係しそうな項目が無いときは、AIに送りません。</div>
+      <div id="bOut"></div>
+    </div>
+    <div class="box">
+      <div class="lab">復習（理解度チェック）</div>
+      <button class="btn wide" id="btnReview">🎓 未理解の項目から1問出す</button>
+      <div class="note">自分の言葉で答えると、AIが辞書の内容と照らして採点します。</div>
+      <div id="rvBox"></div>
+    </div>
+    <div class="box">
+      <div class="lab">知識の穴（無料・端末の中だけ）</div>
+      <div id="gapBox"></div>
+    </div>
+  </div>
+</div>
+
 <!-- AIに聞く -->
 <div class="sheet" id="shAsk">
   <div class="sh-head"><button id="askClose">閉じる</button><h2>AIに聞く</h2><span style="min-width:56px"></span></div>
@@ -243,6 +272,11 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
         <button class="btn" id="btnImportOwn">📥 読み込む</button>
       </div>
       <div class="note">データは、この端末のこのアプリの中にだけ保存されます。消えないよう、ときどき「書き出す」でバックアップしてください（ファイルアプリやiCloud Driveに保存）。</div>
+    </div>
+    <div class="box">
+      <div class="lab">保存時のAI整理</div>
+      <label style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" id="sAutoOrg"><span>Q&amp;Aを保存したとき、AIが空欄（一言・種類・タグ・関連用語）を自動で埋める<br><span class="note">保存のたびにAPIを1回使います。入力済みの内容は上書きしません。見出し語は変えません。</span></span></label>
+      <button class="btn wide" id="btnSaveOrg" style="margin-top:8px">保存</button>
     </div>
     <div class="box">
       <div class="lab">タグの自動付け</div>
@@ -293,7 +327,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
 
 <script>
 'use strict';
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -556,6 +590,7 @@ function openEntry(id) {
   if (back.length) h += '<div class="sec-h" style="margin-top:18px">この項目にリンクしている項目（' + back.length + '）</div>' + back.map(o => '<div class="card" data-open="' + esc(o.id) + '" style="margin:6px 0"><span class="c-term" style="font-size:16px">' + (o.kind && o.kind !== 'term' ? '<span class="kbadge">' + KIND[o.kind] + '</span>' : '') + esc(o.term) + '</span>' + (o.oneLine ? '<div class="c-one">' + esc(o.oneLine) + '</div>' : '') + '</div>').join('');
   if (unres.length) h += '<div class="sec-h" style="margin-top:14px">まだ項目がないリンク（押すと作れます）</div><div>' + unres.map(r => '<button class="wl unres" data-wl="' + esc(r) + '" style="font-size:15px;padding:4px 6px">' + esc(r) + '</button>').join(' ') + '</div>';
   h += '<button class="btn wide" data-graph="' + esc(id) + '" style="margin-top:16px">🕸 この項目のつながりを見る</button>';
+  h += '<button class="btn wide" data-aiconn="' + esc(id) + '" style="margin-top:8px">🔗 AIでつながりを探す（トークンを使います）</button><div id="enAiOut"></div>';
   $('enBody').innerHTML = h;
   openSheet('shEntry');
 }
@@ -676,6 +711,7 @@ async function saveQA() {
   closeSheet('shQA'); refresh();
   if ($('shEntry').classList.contains('open') && viewId) openEntry(viewId);
   toast(old ? 'Q&Aを更新しました' : 'Q&Aを保存しました');
+  if (!old) void autoOrganize(e.id, question, answer);
 }
 async function deleteQA(id) {
   const q = qaById.get(id); if (!q) return;
@@ -728,8 +764,20 @@ function parseAI(raw) {
   if (!o || typeof o !== 'object') return null;
   const str = (v, n) => typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
   const list = (v, n) => [...new Set((Array.isArray(v) ? v : []).map(x => String(x == null ? '' : x).replace(/^#/, '').replace(/\s+/g, '').slice(0, 20)).filter(Boolean))].slice(0, n);
-  const r = { term: str(o.term, 40), oneLine: str(o.oneLine, 120), tags: list(o.tags, 6), related: list(o.related, 6) };
+  const r = { term: str(o.term, 40), oneLine: str(o.oneLine, 120), tags: list(o.tags, 6), related: list(o.related, 6), kind: ['term', 'howto', 'idea'].includes(o.kind) ? o.kind : '' };
   return (r.term || r.oneLine || r.tags.length || r.related.length) ? r : null;
+}
+function orgPrompt(question, answer) {
+  const cnt = {}; entries.forEach(e => (e.tags || []).forEach(t => { cnt[t] = (cnt[t] || 0) + 1; }));
+  const tagsKnown = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 30);
+  const terms = entries.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 60).map(e => e.term);
+  const qText = question.slice(0, 1500);
+  const aText = redact(answer).text.slice(0, 6000);
+  const prompt = '以下は、AIに聞いた「質問」と、その「回答」です。辞書の項目として整理してください。\n必ずJSONだけを返してください（前置き・説明・コードブロックは不要）:\n' +
+    '{"term":"見出し語（20字以内の短い名詞）","oneLine":"一言説明（60字以内）","tags":["タグ1","タグ2"],"related":["関連用語1","関連用語2"],"kind":"term"}\n' +
+    'ルール:\n- kind は、言葉の意味なら term、やり方・手順の流れなら howto、判断の理由・方針・考え方なら idea\n- 回答に書かれていることだけで作る。書かれていないことは足さない\n- term は、下の既存の見出し語に合うものがあれば、そのまま使う\n- tags は2〜5個、related は0〜5個。短い語で。tags は下の既存タグに合うものがあれば使う\n' +
+    '既存の見出し語: ' + (terms.join(', ') || '（なし）') + '\n既存タグ: ' + (tagsKnown.join(', ') || '（なし）') + '\n\n【質問】\n' + redact(qText).text + '\n\n【回答】\n' + aText;
+  return prompt;
 }
 async function runAI() {
   const btn = $('btnAI'); if (btn.disabled) return;
@@ -737,15 +785,7 @@ async function runAI() {
   if (!question || !answer) { toast('質問と回答を入れてから押してください'); return; }
   const rd = redact(question + '\n' + answer);
   if (!confirm('質問と回答をAIに送って、見出し語・一言・タグ・関連用語の候補を作ります。（自分の判断は送りません）' + (rd.removed ? '\n秘密らしい行が' + rd.removed + '行あります。その行は除いて送ります。' : '') + '\nよろしいですか？')) return;
-  const cnt = {}; entries.forEach(e => (e.tags || []).forEach(t => { cnt[t] = (cnt[t] || 0) + 1; }));
-  const tagsKnown = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 30);
-  const terms = entries.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 60).map(e => e.term);
-  const qText = question.slice(0, 1500);
-  const aText = redact(answer).text.slice(0, 6000);
-  const prompt = '以下は、AIに聞いた「質問」と、その「回答」です。辞書の項目として整理してください。\n必ずJSONだけを返してください（前置き・説明・コードブロックは不要）:\n' +
-    '{"term":"見出し語（20字以内の短い名詞）","oneLine":"一言説明（60字以内）","tags":["タグ1","タグ2"],"related":["関連用語1","関連用語2"]}\n' +
-    'ルール:\n- 回答に書かれていることだけで作る。書かれていないことは足さない\n- term は、下の既存の見出し語に合うものがあれば、そのまま使う\n- tags は2〜5個、related は0〜5個。短い語で。tags は下の既存タグに合うものがあれば使う\n' +
-    '既存の見出し語: ' + (terms.join(', ') || '（なし）') + '\n既存タグ: ' + (tagsKnown.join(', ') || '（なし）') + '\n\n【質問】\n' + redact(qText).text + '\n\n【回答】\n' + aText;
+  const prompt = orgPrompt(question, answer);
   const run = ++aiRun; btn.disabled = true; btn.textContent = '✨ 整理中…（最大90秒）';
   let cand = null, err = '';
   try { cand = parseAI(await callAI(prompt)); if (!cand) err = 'AIの返事を読み取れませんでした。もう一度お試しください'; } catch (e) { err = (e && e.message) || String(e); }
@@ -762,6 +802,7 @@ function drawCand() {
   h += '<button class="btn pri wide" data-ai="all" style="margin-top:8px">✓ すべて採用</button>';
   if (c.term) h += '<div class="lab">見出し語</div><div>' + esc(c.term) + (findEntryByTerm(c.term) ? ' <span class="note">（既存の項目です）</span>' : '') + '</div><button class="btn sm" data-ai="term" style="margin-top:4px">✓ 見出し語に使う</button>';
   if (c.oneLine) h += '<div class="lab">一言説明</div><div>' + esc(c.oneLine) + '</div><button class="btn sm" data-ai="one" style="margin-top:4px">✓ 一言に使う</button>';
+  if (c.kind && c.kind !== $('qKind').value) h += '<div class="lab">種類</div><div>' + esc(KIND[c.kind]) + '</div><button class="btn sm" data-ai="kind" style="margin-top:4px">✓ 種類に使う</button>';
   h += '<div class="lab">タグ（押すと追加）</div>' + (tl.length ? tl.map(t => '<button class="tagbtn" data-ai="tag" data-v="' + esc(t) + '">＋#' + esc(t) + '</button>').join('') : '<span class="note">なし／追加済み</span>');
   h += '<div class="lab">関連用語（押すと追加）</div>' + (rl.length ? rl.map(t => '<button class="tagbtn" data-ai="rel" data-v="' + esc(t) + '">＋' + esc(t) + '</button>').join('') : '<span class="note">なし／追加済み</span>');
   $('aiBox').innerHTML = h + '</div>';
@@ -772,13 +813,14 @@ function adoptAI(kind, v) {
   const addTo = (id, list) => { $(id).value = union(splitList($(id).value), list).join(' '); };
   if (kind === 'term') { if (setIf('qTerm', c.term)) onTermChange(); }
   else if (kind === 'one') setIf('qOne', c.oneLine);
+  else if (kind === 'kind') $('qKind').value = c.kind;
   else if (kind === 'tag') addTo('qTags', [v]);
   else if (kind === 'rel') addTo('qRel', [v]);
   else if (kind === 'all') {
     if (c.term && !setIf('qTerm', c.term)) return;
     if (c.term) onTermChange();
     if (c.oneLine) setIf('qOne', c.oneLine);
-    addTo('qTags', c.tags); addTo('qRel', c.related);
+    addTo('qTags', c.tags); addTo('qRel', c.related); if (c.kind) $('qKind').value = c.kind;
   }
   updateSim(); drawCand();
 }
@@ -935,7 +977,7 @@ async function renderSettings() {
   $('syncStat').innerHTML = syncReady() ? (lsGet('kd_sync') === '1' ? '自動同期：オン' : '自動同期：オフ（「今すぐ同期」で開始）') + '<br><span class="note" style="white-space:pre-line">' + esc(syncMsg || (lastS ? '最終同期 ' + dstr(lastS) : 'まだ同期していません')) + '</span><br><span class="note">接続先：' + esc(connDesc()) + '</span>' : '<span class="note">未設定：下の「AIの接続」にエンドポイントとトークンを入れてください</span>';
   const c = aiConfig();
   $('sEndpoint').value = lsGet('kd_endpoint'); $('sToken').value = ''; $('sProvider').value = c.provider; $('sModel').value = lsGet('kd_model');
-  $('sLimit').value = lsGet('kd_limit'); $('sSys').value = lsGet('kd_sys'); $('usageStat').textContent = usageLine();
+  $('sAutoOrg').checked = lsGet('kd_autoorg') === '1'; $('sLimit').value = lsGet('kd_limit'); $('sSys').value = lsGet('kd_sys'); $('usageStat').textContent = usageLine();
   $('aiStat').textContent = (c.endpoint && c.token) ? '接続設定あり' + (lsGet('kd_endpoint') ? '' : '（quick-ref の設定を借りています）') : '未設定（AI整理を使わなければ、設定は不要です）';
 }
 function saveAI() {
@@ -1028,6 +1070,7 @@ async function saveAskDirect() {
   await writeEntries([e]);
   await writeQAs([{ id: uid(), entryId: e.id, question: q, answer: askAnswer, judgment: '', sourceType: c.provider, sourceUrl: '', viaApp: true, model: modelName(), createdAt: now, updatedAt: now }]);
   closeSheet('shAsk'); refresh(); toast('保存しました'); openEntry(e.id);
+  void autoOrganize(e.id, q, askAnswer);
 }
 function askToForm() {
   const tgt = askTarget(), q = $('aQ').value.trim(), a = askAnswer, c = aiConfig();
@@ -1164,7 +1207,7 @@ function wire() {
   $('enClose').addEventListener('click', () => { closeSheet('shEntry'); viewId = null; });
   $('enEdit').addEventListener('click', openEntryEdit);
   $('enBody').addEventListener('click', async e => {
-    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open],[data-wl],[data-graph]'); if (!t) return;
+    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open],[data-wl],[data-graph],[data-aiconn],[data-cn]'); if (!t) return;
     const d = t.dataset;
     if (d.und) await setUnderstanding(d.und);
     else if (d.search) { closeSheet('shEntry'); viewId = null; $('q').value = d.search; searchQuery = d.search; filterUnd = 'all'; document.querySelectorAll('#fchips .fchip').forEach(x => x.classList.toggle('on', x.dataset.f === 'all')); renderList(); }
@@ -1175,6 +1218,8 @@ function wire() {
     else if (d.addto) { const en = entryById.get(d.addto); if (en) openQAForm({ term: en.term }); }
     else if (d.wl) await openOrCreateTerm(d.wl);
     else if (d.graph) openGraph(d.graph);
+    else if (d.aiconn) await aiConnect(d.aiconn);
+    else if (d.cn) await connAdopt(t);
     else if (d.open) openEntry(d.open);
   });
   $('eeCancel').addEventListener('click', () => closeSheet('shEntryEdit'));
@@ -1202,6 +1247,22 @@ function wire() {
   $('btnImportQR').addEventListener('click', () => $('fileQR').click());
   $('fileOwn').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importOwn(f); });
   $('fileQR').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importQuickRef(f); });
+  $('btnBrain').addEventListener('click', openBrain);
+  $('brClose').addEventListener('click', () => closeSheet('shBrain'));
+  $('btnBrainAsk').addEventListener('click', () => { void brainAsk(); });
+  $('btnReview').addEventListener('click', () => { void reviewStart(); });
+  $('btnSaveOrg').addEventListener('click', () => { lsSet('kd_autoorg', $('sAutoOrg').checked ? '1' : '0'); toast($('sAutoOrg').checked ? '保存時のAI整理：オン' : '保存時のAI整理：オフ'); });
+  $('shBrain').addEventListener('click', async e => {
+    const t = e.target.closest('[data-open],[data-wl],[data-br],[data-rv],[data-rvund],#btnGrade'); if (!t) return;
+    const d = t.dataset;
+    if (d.br === 'save') await brainSave();
+    else if (d.br === 'copy') await copyText(brainAns, 'コピーしました');
+    else if (d.rv === 'next') await reviewStart();
+    else if (d.rvund) await reviewSetUnd(d.rvund);
+    else if (t.id === 'btnGrade') await reviewGrade();
+    else if (d.wl) { await openOrCreateTerm(d.wl); drawGaps(); }
+    else if (d.open) openEntry(d.open);
+  });
   $('btnBulkTag').addEventListener('click', () => { void bulkAutoTag(); });
   $('btnSync').addEventListener('click', () => { void kdSync(true); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && lsGet('kd_sync') === '1' && syncReady()) void kdSync(false); });
@@ -1260,6 +1321,181 @@ async function bulkAutoTag() {
   }
   if (out.length) await writeEntries(out);
   refresh(); renderSettings(); toast(n + '項目にタグを付けました');
+}
+
+/* ───────── 辞書AI（Worker の /ai 経由。自分の辞書を材料にする） ───────── */
+const bigramsOf = s => { const t = norm(s).replace(/\s+/g, ''), r = new Set(); for (let i = 0; i < t.length - 1; i++) { const g = t.slice(i, i + 2); if (/[^ぁ-ゟー\d\W_]|[A-Za-z]/.test(g) || /[ァ-ヶ一-龥]/.test(g)) r.add(g); } return r; };
+function entryText(e) { return [e.term, (e.tags || []).join(' '), e.oneLine, e.note].concat((qasByEntry.get(e.id) || []).map(q => q.question + ' ' + q.answer + ' ' + (q.judgment || ''))).join('\n'); }
+function retrieve(query, k) {
+  const qn = norm(query), qb = bigramsOf(query);
+  const scored = entries.map(e => {
+    let s = 0; const tn = norm(e.term);
+    if (tn.length >= 2 && qn.includes(tn)) s += 20;
+    (e.tags || []).forEach(t => { const n = norm(t); if (n.length >= 2 && qn.includes(n)) s += 8; });
+    if (qb.size) {
+      const fields = [[e.term, 6], [(e.tags || []).join(' '), 4], [e.oneLine, 3], [e.note, 2]];
+      (qasByEntry.get(e.id) || []).forEach(q => { fields.push([q.question, 1.2], [q.answer, 1], [q.judgment, 2]); });
+      for (const [txt, w] of fields) { if (!txt) continue; const bs = bigramsOf(txt); let h = 0; qb.forEach(g => { if (bs.has(g)) h++; }); s += w * (h / qb.size) * 10; }
+    }
+    return { e, s };
+  }).filter(x => x.s >= 3).sort((a, b) => b.s - a.s);
+  const out = scored.slice(0, k || 6).map(x => x.e), have = new Set(out.map(e => e.id));
+  for (const e of out.slice(0, 2)) {   // つながっている項目も、少し足す
+    const near = [...(inLinks.get(e.id) || [])].concat([...(outLinks.get(e.id) || new Map()).keys()].map(n => (findEntryByTerm(n) || {}).id).filter(Boolean));
+    for (const id of near) { if (out.length >= (k || 6) + 2) break; if (!have.has(id) && entryById.get(id)) { have.add(id); out.push(entryById.get(id)); } }
+  }
+  return out;
+}
+function material(e, budget) {
+  const qs = (qasByEntry.get(e.id) || []).slice(0, 2);
+  let t = '■[[' + e.term + ']]（' + KIND[e.kind || 'term'] + '・' + UND[e.understanding || 'unknown'] + '）' + (e.oneLine ? '\n一言：' + e.oneLine : '') + ((e.tags || []).length ? '\nタグ：' + e.tags.join(' ') : '') + (e.note ? '\n自分の理解：' + e.note.slice(0, 500) : '');
+  qs.forEach(q => { t += '\nQ：' + q.question.slice(0, 150) + '\nA：' + q.answer.slice(0, 500) + (q.judgment ? '\n自分の判断：' + q.judgment.slice(0, 250) : ''); });
+  return t.slice(0, budget || 1400);
+}
+let brainBusy = false, brainSrc = [], brainAns = '', brainQ = '';
+function brainMeta() { const c = aiConfig(); $('brMeta').innerHTML = (c.endpoint && c.token) ? esc(usageLine()) : '<br>⚠️ AIの接続が未設定です。⚙︎ 設定から入れてください。'; }
+function openBrain() { brainMeta(); drawGaps(); openSheet('shBrain'); }
+async function brainAsk() {
+  if (brainBusy) return;
+  const q = $('bQ').value.trim(); if (!q) { toast('質問を入れてください'); return; }
+  if (!entries.length) { $('bOut').innerHTML = '<div class="banner">辞書がまだ空です。先にQ&amp;Aを足してください。</div>'; return; }
+  const src = retrieve(q, 6);
+  if (!src.length) { $('bOut').innerHTML = '<div class="banner">この質問に関係しそうな項目が、辞書に見つかりませんでした。通常の「🤖AIに聞く」で聞いて、辞書に足せます。（AIには送っていません）</div>'; return; }
+  let mat = ''; for (const e of src) { const m = material(e, 1400); if ((mat + m).length > 7500) break; mat += m + '\n\n'; }
+  const prompt = redact('あなたは、私の個人辞書だけを根拠に答えるアシスタントです。\nルール:\n- 下の【辞書の材料】に書かれていることだけで答える。書かれていないことを推測で足さない\n- 根拠にした項目は、文中で [[見出し語]] の形で示す\n- 「自分の判断」「自分の理解」があれば、AIの回答より優先して示す\n- 材料で足りないときは「辞書には無い」と言い、そのうえで末尾に「（辞書の外・一般知識）」と明記して、短く補足してよい\n- 日本語で、結論から簡潔に\n\n【辞書の材料】\n' + mat + '【質問】\n' + q).text;
+  brainBusy = true; $('btnBrainAsk').disabled = true; $('btnBrainAsk').textContent = '🧠 考え中…（最大90秒）'; $('bOut').innerHTML = '';
+  let ans = '', err = '';
+  try { ans = (await callAI(prompt, { maxTokens: 1200 })).trim(); if (!ans) err = 'AIの返事が空でした'; } catch (e) { err = (e && e.message) || String(e); }
+  brainBusy = false; $('btnBrainAsk').disabled = false; $('btnBrainAsk').textContent = '🧠 辞書に聞く'; brainMeta();
+  if (err) { $('bOut').innerHTML = '<div class="banner">' + esc(err) + '</div>'; return; }
+  brainSrc = src; brainAns = ans; brainQ = q;
+  $('bOut').innerHTML = '<div class="br-card"><div class="lab" style="margin-top:0">答え</div><div>' + rich(ans) + '</div></div>' +
+    '<div class="sec-h">根拠として渡した項目（押すと開きます）</div><div class="br-src">' + src.map(e => '<button class="tagbtn has" data-open="' + esc(e.id) + '">📖 ' + esc(e.term) + '</button>').join('') + '</div>' +
+    '<div class="row" style="margin-top:8px"><button class="btn" data-br="save">📌 この答えを項目として残す</button><button class="btn" data-br="copy">📋 コピー</button></div>';
+}
+async function brainSave() {
+  if (!brainAns) return;
+  const now = Date.now(), c = aiConfig(); let term = firstLine(brainQ).slice(0, 30), n = 2; const base = term;
+  while (findEntryByTerm(term)) term = base + ' ' + (n++);
+  const r = autoExtract(brainQ + '\n' + brainAns, term, 5);
+  const e = { id: uid(), term, kind: 'idea', oneLine: '', tags: r.tags, related: r.related, note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
+  await writeEntries([e]);
+  await writeQAs([{ id: uid(), entryId: e.id, question: brainQ, answer: brainAns, judgment: '', sourceType: c.provider, sourceUrl: '', viaApp: true, model: modelName(), createdAt: now, updatedAt: now }]);
+  refresh(); toast('項目として残しました（考え方）'); openEntry(e.id);
+}
+
+/* 復習 */
+let rv = null;
+function pickReview() {
+  const cand = entries.filter(e => (e.understanding || 'unknown') !== 'known' && (e.note || (qasByEntry.get(e.id) || []).length));
+  if (!cand.length) return null;
+  const rank = e => ((e.understanding || 'unknown') === 'unknown' ? 0 : 1e13) + (e.checkedAt || 0);
+  cand.sort((a, b) => rank(a) - rank(b));
+  const skip = rv ? rv.skip : new Set(); return cand.find(e => !skip.has(e.id)) || cand[0];
+}
+async function reviewStart() {
+  if (brainBusy) return;
+  const e = pickReview(); if (!e) { $('rvBox').innerHTML = '<div class="note">復習できる項目がありません（未理解・理解中で、中身のある項目）。</div>'; return; }
+  const skip = rv ? rv.skip : new Set(); skip.add(e.id);
+  brainBusy = true; $('btnReview').disabled = true; $('rvBox').innerHTML = '<div class="note">問題を作っています…</div>';
+  let q = '', err = '';
+  try {
+    const raw = await callAI(redact('次の辞書の項目の内容をもとに、私が理解できているかを確かめる短い質問を1つ作ってください。内容に書かれていることだけで答えられる質問にしてください。\nJSONだけを返してください: {"question":"質問文（80字以内）"}\n\n' + material(e, 1800)).text, { maxTokens: 300 });
+    const a = raw.indexOf('{'), b = raw.lastIndexOf('}'); const o = JSON.parse(raw.slice(a, b + 1)); q = String(o.question || '').trim().slice(0, 200);
+    if (!q) err = '問題を作れませんでした';
+  } catch (x) { err = (x && x.message) || '問題を作れませんでした'; }
+  brainBusy = false; $('btnReview').disabled = false; brainMeta();
+  if (err) { $('rvBox').innerHTML = '<div class="banner">' + esc(err) + '</div>'; return; }
+  rv = { id: e.id, q, skip };
+  $('rvBox').innerHTML = '<div class="br-card"><div class="sec-h" style="margin-top:0">「' + esc(e.term) + '」の問題</div><div style="font-size:17px">' + esc(q) + '</div></div>' +
+    '<textarea id="rvA" rows="4" placeholder="自分の言葉で答える（分からなければ「分からない」でOK）"></textarea><button class="btn pri wide" id="btnGrade" style="margin-top:8px">採点する</button>';
+}
+async function reviewGrade() {
+  if (brainBusy || !rv) return;
+  const e = entryById.get(rv.id), ans = ($('rvA').value || '').trim(); if (!e) return; if (!ans) { toast('答えを書いてください'); return; }
+  brainBusy = true; $('btnGrade').disabled = true; $('btnGrade').textContent = '採点中…';
+  let o = null, err = '';
+  try {
+    const raw = await callAI(redact('次の辞書の内容を正解の基準にして、私の答えを採点してください。\nJSONだけを返してください: {"verdict":"ok か partial か ng","feedback":"できている点・足りない点（100字以内）","model":"模範解答（100字以内）"}\n\n【辞書の内容】\n' + material(e, 1800) + '\n\n【質問】\n' + rv.q + '\n\n【私の答え】\n' + ans).text, { maxTokens: 500 });
+    const a = raw.indexOf('{'), b = raw.lastIndexOf('}'); o = JSON.parse(raw.slice(a, b + 1));
+  } catch (x) { err = (x && x.message) || '採点できませんでした'; }
+  brainBusy = false; brainMeta();
+  if (err || !o) { $('btnGrade').disabled = false; $('btnGrade').textContent = '採点する'; toast((err || '採点できませんでした').slice(0, 80)); return; }
+  const v = ['ok', 'partial', 'ng'].includes(o.verdict) ? o.verdict : 'partial', sug = { ok: 'known', partial: 'learning', ng: 'unknown' }[v];
+  const VL = { ok: '⭕ できています', partial: '△ もう少し', ng: '✕ 復習が必要' };
+  $('rvBox').insertAdjacentHTML('beforeend', '<div class="br-card"><div class="vd-' + v + '">' + VL[v] + '</div><div style="margin-top:6px">' + esc(String(o.feedback || '').slice(0, 200)) + '</div><div class="sec-h">模範解答</div><div>' + esc(String(o.model || '').slice(0, 200)) + '</div></div>' +
+    '<div class="sec-h">理解度を決める（AIのおすすめに印）</div><div class="und-row">' + ['unknown', 'learning', 'known'].map(k => '<button class="und-' + k + (k === sug ? ' on' : '') + '" data-rvund="' + k + '">' + UND[k] + (k === sug ? '（おすすめ）' : '') + '</button>').join('') + '</div>' +
+    '<div class="row"><button class="btn" data-rv="next">次の問題</button><button class="btn" data-open="' + esc(e.id) + '">項目を開く</button></div>');
+  $('btnGrade').style.display = 'none';
+}
+async function reviewSetUnd(k) {
+  const e = rv && entryById.get(rv.id); if (!e) return;
+  await writeEntries([Object.assign({}, e, { understanding: k, checkedAt: Date.now(), updatedAt: Date.now() })]);
+  refresh(); toast('「' + e.term + '」を「' + UND[k] + '」にしました'); void reviewStart();
+}
+
+/* 知識の穴（端末の中だけ） */
+function drawGaps() {
+  const termSet = new Set(entries.map(e => norm(e.term))), refs = new Map();
+  for (const e of entries) for (const [n, raw] of (outLinks.get(e.id) || new Map())) { if (termSet.has(n)) continue; const o = refs.get(n) || { raw, c: 0 }; o.c++; refs.set(n, o); }
+  const missing = [...refs.values()].sort((a, b) => b.c - a.c).slice(0, 8);
+  const hot = entries.filter(e => (e.understanding || 'unknown') === 'unknown').map(e => ({ e, n: (inLinks.get(e.id) || new Set()).size + (e.related || []).length * 0.3 })).filter(x => x.n >= 1).sort((a, b) => b.n - a.n).slice(0, 6);
+  const lone = entries.filter(e => !(e.tags || []).length && !(inLinks.get(e.id) || new Set()).size && !(outLinks.get(e.id) || new Map()).size).slice(0, 6);
+  let h = '';
+  h += '<div class="sec-h" style="margin-top:0">まだ項目がない言葉（よく出てくる順。押すと作れます）</div>' + (missing.length ? '<div>' + missing.map(m => '<button class="wl unres" data-wl="' + esc(m.raw) + '" style="font-size:15px;padding:4px 6px">' + esc(m.raw) + (m.c > 1 ? '×' + m.c : '') + '</button>').join(' ') + '</div>' : '<div class="note">なし</div>');
+  h += '<div class="sec-h">未理解なのに、よく参照されている項目</div>' + (hot.length ? hot.map(x => '<div class="card" data-open="' + esc(x.e.id) + '" style="margin:6px 0"><span class="c-term" style="font-size:16px">' + esc(x.e.term) + '</span><div class="c-meta">参照されている数：' + (inLinks.get(x.e.id) || new Set()).size + '　関連用語：' + (x.e.related || []).length + '</div></div>').join('') : '<div class="note">なし</div>');
+  h += '<div class="sec-h">どこともつながっていない項目</div>' + (lone.length ? '<div>' + lone.map(e => '<button class="tagbtn" data-open="' + esc(e.id) + '">' + esc(e.term) + '</button>').join('') + '</div><div class="note">タグも[[リンク]]も無い項目です。⚙︎ の「タグの自動付け」や、項目の「🔗 AIでつながりを探す」が使えます。</div>' : '<div class="note">なし</div>');
+  $('gapBox').innerHTML = h;
+}
+
+/* 項目から：AIでつながりを探す */
+let connRes = null;
+async function aiConnect(id) {
+  const e = entryById.get(id); if (!e || brainBusy) return;
+  const out = $('enAiOut'); if (!out) return;
+  const mine = new Set((e.tags || []).map(norm));
+  const others = entries.filter(o => o.id !== id).map(o => ({ o, s: (o.tags || []).filter(t => mine.has(norm(t))).length * 3 + ((o.updatedAt || 0) / 1e13) })).sort((a, b) => b.s - a.s).slice(0, 120).map(x => '・' + x.o.term + (x.o.oneLine ? '：' + x.o.oneLine.slice(0, 40) : ''));
+  if (!others.length) { out.innerHTML = '<div class="note">ほかの項目がまだありません。</div>'; return; }
+  brainBusy = true; out.innerHTML = '<div class="note">AIがつながりを探しています…（最大90秒）</div>';
+  let o = null, err = '';
+  try {
+    const raw = await callAI(redact('次の「対象の項目」と、辞書にある「ほかの項目」を見て、つながりを提案してください。\nJSONだけを返してください: {"links":[{"term":"ほかの項目の見出し語（一覧にあるもの、そのまま）","reason":"つながる理由（30字以内）"}],"gaps":[{"topic":"辞書に足りなそうな知識（20字以内）","reason":"なぜ必要か（30字以内）"}]}\nルール: links は最大5件で、必ず下の一覧にある見出し語だけ。gaps は最大3件。\n\n【対象の項目】\n' + material(e, 1800) + '\n\n【ほかの項目】\n' + others.join('\n')).text, { maxTokens: 800 });
+    const a = raw.indexOf('{'), b = raw.lastIndexOf('}'); o = JSON.parse(raw.slice(a, b + 1));
+  } catch (x) { err = (x && x.message) || '提案を読み取れませんでした'; }
+  brainBusy = false;
+  if (err || !o) { out.innerHTML = '<div class="banner">' + esc(err || '失敗しました') + '</div>'; return; }
+  const links = (Array.isArray(o.links) ? o.links : []).map(l => ({ e: findEntryByTerm(String(l && l.term || '')), r: String(l && l.reason || '').slice(0, 60) })).filter(x => x.e && x.e.id !== id).slice(0, 5);
+  const gaps = (Array.isArray(o.gaps) ? o.gaps : []).map(g => ({ t: String(g && g.topic || '').trim().slice(0, 30), r: String(g && g.reason || '').slice(0, 60) })).filter(x => x.t).slice(0, 3);
+  connRes = { id, links, gaps };
+  out.innerHTML = '<div class="cand"><b style="color:#d98a00">✦ AIの提案</b><span class="note">（押したものだけ反映します）</span>' +
+    '<div class="lab">つながりそうな項目</div>' + (links.length ? links.map((x, i) => '<div class="br-card"><b>' + esc(x.e.term) + '</b><div class="note">' + esc(x.r) + '</div><div class="row" style="margin-top:6px"><button class="btn sm" data-cn="rel" data-i="' + i + '">＋ 関連用語に足す</button><button class="btn sm" data-open="' + esc(x.e.id) + '">開く</button></div></div>').join('') : '<div class="note">見つかりませんでした</div>') +
+    '<div class="lab">辞書に足りなそうな知識</div>' + (gaps.length ? gaps.map((x, i) => '<div class="br-card"><b>' + esc(x.t) + '</b><div class="note">' + esc(x.r) + '</div><div style="margin-top:6px"><button class="btn sm" data-cn="gap" data-i="' + i + '">＋ 項目を作る</button></div></div>').join('') : '<div class="note">なし</div>') + '</div>';
+}
+async function connAdopt(btn) {
+  const r = connRes, i = Number(btn.dataset.i); if (!r) return;
+  const e = entryById.get(r.id); if (!e) return;
+  if (btn.dataset.cn === 'rel') {
+    const x = r.links[i]; if (!x) return;
+    await writeEntries([Object.assign({}, e, { related: union(e.related, [x.e.term]), updatedAt: Date.now() })]); refresh();
+  } else {
+    const g = r.gaps[i]; if (!g || findEntryByTerm(g.t)) { btn.textContent = '作成済み'; btn.disabled = true; return; }
+    const now = Date.now(); await writeEntries([{ id: uid(), term: g.t, kind: 'term', oneLine: g.r, tags: [], related: [e.term], note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now }]); refresh();
+  }
+  btn.textContent = '✓ 反映しました'; btn.disabled = true;
+}
+
+/* 保存時の自動整理（設定で入れたときだけ） */
+async function autoOrganize(entryId, question, answer) {
+  if (lsGet('kd_autoorg') !== '1') return;
+  const c = aiConfig(); if (!c.endpoint || !c.token) return;
+  try {
+    const cand = parseAI(await callAI(orgPrompt(question, answer))); if (!cand) return;
+    const e = entryById.get(entryId); if (!e) return;
+    const one = e.oneLine || cand.oneLine || '', nQ = (qasByEntry.get(entryId) || []).length;
+    const kind = (e.kind === 'term' && nQ <= 1 && cand.kind) ? cand.kind : (e.kind || 'term');
+    await writeEntries([Object.assign({}, e, { oneLine: one, kind, tags: union(e.tags, cand.tags), related: union(e.related, cand.related.filter(t => norm(t) !== norm(e.term))), updatedAt: Date.now() })]);
+    refresh(); if ($('shEntry').classList.contains('open') && viewId === entryId) openEntry(entryId); toast('AIが一言・タグなどを整理しました');
+  } catch (_) { /* 失敗しても保存は済んでいる */ }
 }
 
 /* ───────── タグ・関連用語を、その場で選ぶ／作る ───────── */
