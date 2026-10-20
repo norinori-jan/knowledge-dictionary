@@ -164,6 +164,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
     <label class="lab" for="eeKind">種類</label><select id="eeKind"><option value="term">用語（言葉の意味）</option><option value="howto">手順（やり方の流れ）</option><option value="idea">考え方（判断の理由・方針）</option></select>
     <label class="lab" for="eeOne">一言説明</label><input id="eeOne" maxlength="120" placeholder="例：APIの認証に使うトークン形式">
     <label class="lab" for="eeTags">タグ（カンマか空白で区切る）</label><input id="eeTags" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="lab" for="eeAlias">別名（統合した語など。カンマで区切る。[[別名]]のリンクもこの項目に届きます）</label><input id="eeAlias" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="lab" for="eeRel">関連用語（カンマか空白で区切る）</label><input id="eeRel" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="lab" for="eeNote" style="display:flex;justify-content:space-between;align-items:center">自分の理解（自分の言葉で。手順は「1. 2. 3.」の行で） <button class="btn sm" type="button" data-linkpick="eeNote">🔗 リンク</button></label><textarea id="eeNote" rows="6" placeholder="例：1. [[JWT]] を発行する&#10;2. [[Cookie]] に入れる"></textarea>
     <div class="note">[[見出し語]] と書くと、その項目へのリンクになります（Obsidianと同じ書き方）。</div>
@@ -203,6 +204,17 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
   </div>
 </div>
 
+<!-- 項目の統合 -->
+<div class="sheet" id="shMerge">
+  <div class="sh-head"><button id="mgClose">閉じる</button><h2>項目を統合する</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <div class="box" id="mgHead"></div>
+    <input id="mgQ" placeholder="統合する相手を探す（見出し語・タグ）" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <div id="mgList" style="margin-top:8px"></div>
+    <div class="note">相手の項目は、この項目に吸収されます。相手のQ&amp;Aはこの項目に移り、相手の見出し語は「別名」になります（その語の[[リンク]]もこの項目に届きます）。元に戻せません。</div>
+  </div>
+</div>
+
 <!-- 辞書AI -->
 <div class="sheet" id="shBrain">
   <div class="sh-head"><button id="brClose">閉じる</button><h2>🧠 辞書AI</h2><span style="min-width:56px"></span></div>
@@ -212,7 +224,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
       <div class="lab">辞書に聞く（自分の辞書だけを根拠に答える）</div>
       <textarea id="bQ" rows="3" placeholder="例：認証まわりで、自分はこれまで何を決めた？"></textarea>
       <button class="btn pri wide" id="btnBrainAsk" style="margin-top:8px">🧠 辞書に聞く</button>
-      <div class="note">質問に関係する項目・Q&amp;A・自分の判断を探して、それを材料にAIが答えます。根拠の項目は[[リンク]]で示します。関係しそうな項目が無いときは、AIに送りません。</div>
+      <div class="note">質問に関係する項目・Q&amp;A・自分の判断を探して、それを材料にAIが答えます。根拠の項目は[[リンク]]で示します。材料が少ないときは、言い換えを探すために、質問と辞書の語彙（見出し語・タグだけ）をAIに送ります。それでも関係する項目が無ければ、答えは聞きません。</div>
       <div id="bOut"></div>
     </div>
     <div class="box">
@@ -293,6 +305,8 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
     </div>
     <div class="box">
       <div class="lab">quick-ref から取り込む</div>
+      <button class="btn wide" id="btnQRCloud">☁️ quick-ref から取り込む（クラウド経由・おすすめ）</button>
+      <label style="display:flex;gap:10px;align-items:center;margin:8px 0"><input type="checkbox" id="sQrAuto"><span>起動時に、新しいAI Q&amp;Aを自動で取り込む</span></label>
       <button class="btn wide" id="btnImportQR">📥 quick-ref の書き出しJSONを選ぶ</button>
       <div class="note">quick-ref の「JSONエクスポート」で作ったファイルを選びます。「AI Q&amp;A」のメモだけを取り込みます（保護メモ・ふつうのメモは取り込みません）。同じファイルを何度選んでも、重複しません。</div>
     </div>
@@ -327,7 +341,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
 
 <script>
 'use strict';
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -398,7 +412,7 @@ function rebuild() {
   qasByEntry = new Map();
   qas.forEach(q => { if (!qasByEntry.has(q.entryId)) qasByEntry.set(q.entryId, []); qasByEntry.get(q.entryId).push(q); });
   for (const a of qasByEntry.values()) a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
-  idxCache.clear(); rebuildLinks();
+  idxCache.clear(); rbCache.clear(); rebuildLinks();
 }
 /* [[見出し語]] と関連用語から、項目どうしのリンクを集める（Obsidianのリンク・被リンクと同じ考え方） */
 function linksIn(text) {
@@ -407,10 +421,11 @@ function linksIn(text) {
 let outLinks = new Map(), inLinks = new Map();
 function rebuildLinks() {
   outLinks = new Map(); inLinks = new Map();
-  const termId = new Map(entries.map(e => [norm(e.term), e.id]));
+  const termId = new Map(); entries.forEach(e => { (e.aliases || []).forEach(a => termId.set(norm(a), e.id)); });
+  entries.forEach(e => termId.set(norm(e.term), e.id));
   for (const e of entries) {
-    const mine = norm(e.term), m = new Map();
-    const add = t => { const n = norm(t); if (n && n !== mine && !m.has(n)) m.set(n, String(t).trim()); };
+    const mine = norm(e.term), myAl = new Set((e.aliases || []).map(norm)), m = new Map();
+    const add = t => { const n = norm(t); if (n && n !== mine && !myAl.has(n) && !m.has(n)) m.set(n, String(t).trim()); };
     [e.oneLine, e.note].forEach(t => linksIn(t).forEach(add));
     (e.related || []).forEach(add);
     (qasByEntry.get(e.id) || []).forEach(q => [q.question, q.answer, q.judgment].forEach(t => linksIn(t).forEach(add)));
@@ -442,7 +457,8 @@ function afterWrite() {
   if (!persistAsked && navigator.storage && navigator.storage.persist) { persistAsked = true; navigator.storage.persist().catch(() => {}); }
   scheduleSync();
 }
-const findEntryByTerm = term => { const n = norm(term); return n ? entries.find(e => norm(e.term) === n) : null; };
+const findEntryByTerm = term => { const n = norm(term); return n ? (entries.find(e => norm(e.term) === n) || entries.find(e => (e.aliases || []).some(a => norm(a) === n))) : null; };
+const splitAlias = s => [...new Set(String(s || '').split(/[,、，\n]+/).map(x => x.trim().slice(0, 60)).filter(Boolean))].slice(0, 12);
 const splitList = s => [...new Set(String(s || '').split(/[,、，\s#＃]+/).map(x => x.trim().slice(0, 30)).filter(Boolean))].slice(0, 12);
 const union = (a, b) => { const seen = new Set(), out = []; for (const x of [].concat(a || [], b || [])) { const k = norm(x); if (k && !seen.has(k)) { seen.add(k); out.push(x); } } return out; };
 
@@ -457,7 +473,7 @@ function idxOf(e) {
   let x = idxCache.get(e.id); if (x) return x;
   const qs = qasByEntry.get(e.id) || [];
   const qa = qs.map(q => norm([q.question, q.answer, q.judgment].join(' ')));
-  x = { term: norm(e.term), one: norm(e.oneLine), tags: (e.tags || []).map(norm), rel: (e.related || []).map(norm), note: norm(e.note), qa, qaQ: qs.map(q => norm(q.question)), all: '', bi: null };
+  x = { alias: (e.aliases || []).map(norm), term: norm(e.term), one: norm(e.oneLine), tags: (e.tags || []).map(norm), rel: (e.related || []).map(norm), note: norm(e.note), qa, qaQ: qs.map(q => norm(q.question)), all: '', bi: null };
   x.all = [x.term, x.one, x.tags.join(' '), x.rel.join(' '), x.note, qa.join(' ')].join(' ');
   idxCache.set(e.id, x); return x;
 }
@@ -469,7 +485,9 @@ function scoreEntry(e, toks) {
     let s = 0;
     if (x.term === q) s = 100;
     else if (x.tags.includes(q)) s = 80;
+    else if (x.alias.includes(q)) s = 90;
     else if (x.term.includes(q)) s = 50;
+    else if (x.alias.some(a => a.includes(q))) s = 40;
     else if (x.tags.some(t => t.includes(q))) s = 30;
     else if (x.one.includes(q)) s = 20;
     else if (x.rel.some(t => t.includes(q))) s = 15;
@@ -565,6 +583,7 @@ function openEntry(id) {
   const rel = entries.filter(o => o.id !== id).map(o => { const sh = (o.tags || []).filter(t => mine.has(norm(t))); return { o, n: sh.length, sh }; }).filter(x => x.n > 0)
     .sort((a, b) => (b.n - a.n) || ((b.o.updatedAt || 0) - (a.o.updatedAt || 0))).slice(0, 8);
   let h = '<div class="v-term">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge" style="font-size:12px">' + KIND[e.kind] + '</span>' : '') + esc(e.term) + '</div>';
+  if ((e.aliases || []).length) h += '<div class="note">別名：' + e.aliases.map(esc).join('、') + '</div>';
   if (e.oneLine) h += '<div style="font-size:17px;margin-top:4px">' + rich(e.oneLine) + '</div>';
   h += '<div class="und-row">' + ['unknown', 'learning', 'known'].map(k => '<button class="und-' + k + (u === k ? ' on' : '') + '" data-und="' + k + '">' + UND[k] + '</button>').join('') + '</div>';
   if (e.checkedAt) h += '<div class="note" style="margin-top:-4px">理解度を確認した日：' + dstr(e.checkedAt) + '</div>';
@@ -585,11 +604,12 @@ function openEntry(id) {
   h += '<div class="note">「再質問用にコピー」は、この項目の質問・回答・自分の判断・自分の理解をまとめて、AIに続きを聞くための文をコピーします。</div>';
   if (rel.length) h += '<div class="sec-h" style="margin-top:18px">タグでつながる項目（押すと開きます）</div>' + rel.map(x => '<div class="card" data-open="' + esc(x.o.id) + '" style="margin:6px 0"><span class="c-term" style="font-size:16px">' + esc(x.o.term) + '</span>' + (x.o.oneLine ? '<div class="c-one">' + esc(x.o.oneLine) + '</div>' : '') + '<div class="c-meta">共通のタグ：' + x.sh.map(t => '#' + esc(t)).join(' ') + '</div></div>').join('');
   const back = [...(inLinks.get(id) || [])].map(i => entryById.get(i)).filter(Boolean).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  const termSet = new Set(entries.map(x => norm(x.term)));
+  const termSet = new Set(); entries.forEach(x => { termSet.add(norm(x.term)); (x.aliases || []).forEach(a => termSet.add(norm(a))); });
   const unres = [...(outLinks.get(id) || new Map())].filter(([n]) => !termSet.has(n)).map(([, raw]) => raw);
   if (back.length) h += '<div class="sec-h" style="margin-top:18px">この項目にリンクしている項目（' + back.length + '）</div>' + back.map(o => '<div class="card" data-open="' + esc(o.id) + '" style="margin:6px 0"><span class="c-term" style="font-size:16px">' + (o.kind && o.kind !== 'term' ? '<span class="kbadge">' + KIND[o.kind] + '</span>' : '') + esc(o.term) + '</span>' + (o.oneLine ? '<div class="c-one">' + esc(o.oneLine) + '</div>' : '') + '</div>').join('');
   if (unres.length) h += '<div class="sec-h" style="margin-top:14px">まだ項目がないリンク（押すと作れます）</div><div>' + unres.map(r => '<button class="wl unres" data-wl="' + esc(r) + '" style="font-size:15px;padding:4px 6px">' + esc(r) + '</button>').join(' ') + '</div>';
   h += '<button class="btn wide" data-graph="' + esc(id) + '" style="margin-top:16px">🕸 この項目のつながりを見る</button>';
+  h += '<button class="btn wide" data-merge="' + esc(id) + '" style="margin-top:8px">🔀 ほかの項目と統合する</button>';
   h += '<button class="btn wide" data-aiconn="' + esc(id) + '" style="margin-top:8px">🔗 AIでつながりを探す（トークンを使います）</button><div id="enAiOut"></div>';
   $('enBody').innerHTML = h;
   openSheet('shEntry');
@@ -607,7 +627,7 @@ async function setUnderstanding(k) {
 function openEntryEdit() {
   const e = entryById.get(viewId); if (!e) return;
   $('eeTerm').value = e.term; $('eeOne').value = e.oneLine || ''; $('eeTags').value = (e.tags || []).join(' ');
-  $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || ''; $('eeKind').value = e.kind || 'term';
+  $('eeAlias').value = (e.aliases || []).join('、'); $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || ''; $('eeKind').value = e.kind || 'term';
   openSheet('shEntryEdit');
 }
 async function saveEntryEdit() {
@@ -615,7 +635,7 @@ async function saveEntryEdit() {
   const term = $('eeTerm').value.trim(); if (!term) { toast('見出し語を入れてください'); return; }
   const other = findEntryByTerm(term);
   if (other && other.id !== e.id) { toast('同じ見出し語の項目があります。名前を変えてください'); return; }
-  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), note: $('eeNote').value.trim(), kind: $('eeKind').value, updatedAt: Date.now() })]);
+  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), aliases: splitAlias($('eeAlias').value), note: $('eeNote').value.trim(), kind: $('eeKind').value, updatedAt: Date.now() })]);
   closeSheet('shEntryEdit'); openEntry(viewId); refresh(); toast('保存しました');
 }
 async function deleteEntry() {
@@ -852,6 +872,9 @@ async function importQuickRef(file) {
   let o; try { o = JSON.parse(await file.text()); } catch (_) { toast('JSONとして読めませんでした'); return; }
   const items = o && Array.isArray(o.items) ? o.items : Array.isArray(o) ? o : null;
   if (!items) { toast('quick-ref の書き出しファイルではありません'); return; }
+  await qrImportItems(items, false);
+}
+async function qrImportItems(items, silent) {
   let added = 0, dup = 0, skipped = 0;
   const touchedE = new Map(), newQ = [];
   const getE = term => { const n = norm(term); return [...touchedE.values()].find(e => norm(e.term) === n) || findEntryByTerm(term); };
@@ -871,7 +894,8 @@ async function importQuickRef(file) {
   if (touchedE.size) await writeEntries([...touchedE.values()]);
   if (newQ.length) await writeQAs(newQ);
   refresh(); renderSettings();
-  toast('取り込み ' + added + '件／すでにあった ' + dup + '件／対象外 ' + skipped + '件');
+  if (!silent || added) toast((silent ? 'quick-ref から ' + added + '件 取り込みました' : '取り込み ' + added + '件／すでにあった ' + dup + '件／対象外 ' + skipped + '件'));
+  return added;
 }
 
 
@@ -967,6 +991,21 @@ async function kdSync(show) {
   } finally { syncBusy = false; }
 }
 
+async function qrCloudImport(silent) {
+  const c = aiConfig(); if (!c.endpoint || !c.token) { if (!silent) toast('先に「AIの接続」のエンドポイントとトークンを入れてください'); return; }
+  try {
+    const ctl = new AbortController(); setTimeout(() => ctl.abort(), 30000);
+    const r = await fetch(c.endpoint + '/sync/quick-ref', { headers: { Authorization: 'Bearer ' + c.token }, signal: ctl.signal });
+    if (r.status === 404) { if (!silent) toast('クラウドに quick-ref のデータがありません'); return; }
+    if (r.status === 401 || r.status === 403) throw new Error('トークンが違います（' + r.status + '）');
+    if (!r.ok) throw new Error('受信失敗（' + r.status + '）');
+    const j = await r.json(), d = j && j.data, items = Array.isArray(d) ? d : (d && d.items);
+    if (!Array.isArray(items)) throw new Error('quick-ref の形式が想定と違います');
+    const n = await qrImportItems(items, silent);
+    if (!silent && !n) toast('新しく取り込めるAI Q&Aはありませんでした');
+  } catch (e) { if (!silent) toast('取り込めませんでした：' + (((e && e.name === 'AbortError') ? '時間切れ' : (e && e.message)) || e).toString().slice(0, 80)); }
+}
+
 /* ───────── 設定 ───────── */
 async function renderSettings() {
   const last = Number(lsGet('kd_last_backup')) || 0;
@@ -977,7 +1016,7 @@ async function renderSettings() {
   $('syncStat').innerHTML = syncReady() ? (lsGet('kd_sync') === '1' ? '自動同期：オン' : '自動同期：オフ（「今すぐ同期」で開始）') + '<br><span class="note" style="white-space:pre-line">' + esc(syncMsg || (lastS ? '最終同期 ' + dstr(lastS) : 'まだ同期していません')) + '</span><br><span class="note">接続先：' + esc(connDesc()) + '</span>' : '<span class="note">未設定：下の「AIの接続」にエンドポイントとトークンを入れてください</span>';
   const c = aiConfig();
   $('sEndpoint').value = lsGet('kd_endpoint'); $('sToken').value = ''; $('sProvider').value = c.provider; $('sModel').value = lsGet('kd_model');
-  $('sAutoOrg').checked = lsGet('kd_autoorg') === '1'; $('sLimit').value = lsGet('kd_limit'); $('sSys').value = lsGet('kd_sys'); $('usageStat').textContent = usageLine();
+  $('sQrAuto').checked = lsGet('kd_qrauto') === '1'; $('sAutoOrg').checked = lsGet('kd_autoorg') === '1'; $('sLimit').value = lsGet('kd_limit'); $('sSys').value = lsGet('kd_sys'); $('usageStat').textContent = usageLine();
   $('aiStat').textContent = (c.endpoint && c.token) ? '接続設定あり' + (lsGet('kd_endpoint') ? '' : '（quick-ref の設定を借りています）') : '未設定（AI整理を使わなければ、設定は不要です）';
 }
 function saveAI() {
@@ -1114,7 +1153,7 @@ async function openOrCreateTerm(term) {
 /* ───────── つながり図（リンク・関連用語から） ───────── */
 let grCenter = null;
 function buildGraph(center) {
-  const termId = new Map(entries.map(e => [norm(e.term), e.id])), edges = [], seen = new Set();
+  const termId = new Map(); entries.forEach(e => { (e.aliases || []).forEach(a => termId.set(norm(a), e.id)); }); entries.forEach(e => termId.set(norm(e.term), e.id)); const edges = [], seen = new Set();
   for (const e of entries) for (const n of (outLinks.get(e.id) || new Map()).keys()) {
     const t = termId.get(n); if (!t || t === e.id) continue;
     const k = e.id < t ? e.id + '|' + t : t + '|' + e.id; if (!seen.has(k)) { seen.add(k); edges.push([e.id, t]); }
@@ -1207,7 +1246,7 @@ function wire() {
   $('enClose').addEventListener('click', () => { closeSheet('shEntry'); viewId = null; });
   $('enEdit').addEventListener('click', openEntryEdit);
   $('enBody').addEventListener('click', async e => {
-    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open],[data-wl],[data-graph],[data-aiconn],[data-cn]'); if (!t) return;
+    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open],[data-wl],[data-graph],[data-aiconn],[data-cn],[data-merge]'); if (!t) return;
     const d = t.dataset;
     if (d.und) await setUnderstanding(d.und);
     else if (d.search) { closeSheet('shEntry'); viewId = null; $('q').value = d.search; searchQuery = d.search; filterUnd = 'all'; document.querySelectorAll('#fchips .fchip').forEach(x => x.classList.toggle('on', x.dataset.f === 'all')); renderList(); }
@@ -1218,6 +1257,7 @@ function wire() {
     else if (d.addto) { const en = entryById.get(d.addto); if (en) openQAForm({ term: en.term }); }
     else if (d.wl) await openOrCreateTerm(d.wl);
     else if (d.graph) openGraph(d.graph);
+    else if (d.merge) openMerge(d.merge);
     else if (d.aiconn) await aiConnect(d.aiconn);
     else if (d.cn) await connAdopt(t);
     else if (d.open) openEntry(d.open);
@@ -1244,17 +1284,31 @@ function wire() {
   $('stClose').addEventListener('click', () => closeSheet('shSet'));
   $('btnExport').addEventListener('click', exportData);
   $('btnImportOwn').addEventListener('click', () => $('fileOwn').click());
+  $('btnQRCloud').addEventListener('click', () => { void qrCloudImport(false); });
+  $('sQrAuto').addEventListener('change', () => { lsSet('kd_qrauto', $('sQrAuto').checked ? '1' : '0'); toast($('sQrAuto').checked ? '起動時の自動取り込み：オン' : '起動時の自動取り込み：オフ'); });
   $('btnImportQR').addEventListener('click', () => $('fileQR').click());
   $('fileOwn').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importOwn(f); });
   $('fileQR').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importQuickRef(f); });
+  $('mgClose').addEventListener('click', () => closeSheet('shMerge'));
+  $('mgQ').addEventListener('input', drawMerge);
+  $('mgList').addEventListener('click', async ev => {
+    const it = ev.target.closest('[data-mg]'); if (!it) return;
+    if (await confirmMerge(mergeFor, it.dataset.mg)) { closeSheet('shMerge'); openEntry(mergeFor); toast('統合しました'); }
+  });
   $('btnBrain').addEventListener('click', openBrain);
   $('brClose').addEventListener('click', () => closeSheet('shBrain'));
   $('btnBrainAsk').addEventListener('click', () => { void brainAsk(); });
   $('btnReview').addEventListener('click', () => { void reviewStart(); });
   $('btnSaveOrg').addEventListener('click', () => { lsSet('kd_autoorg', $('sAutoOrg').checked ? '1' : '0'); toast($('sAutoOrg').checked ? '保存時のAI整理：オン' : '保存時のAI整理：オフ'); });
   $('shBrain').addEventListener('click', async e => {
-    const t = e.target.closest('[data-open],[data-wl],[data-br],[data-rv],[data-rvund],#btnGrade'); if (!t) return;
+    const t = e.target.closest('[data-open],[data-wl],[data-br],[data-rv],[data-rvund],[data-mgpair],#btnGrade'); if (!t) return;
     const d = t.dataset;
+    if (d.mgpair) {
+      const [a, b] = d.mgpair.split('|'), na = (qasByEntry.get(a) || []).length, nb = (qasByEntry.get(b) || []).length;
+      const keep = nb > na ? b : a, drop = keep === a ? b : a;
+      if (await confirmMerge(keep, drop)) { drawGaps(); toast('統合しました'); }
+      return;
+    }
     if (d.br === 'save') await brainSave();
     else if (d.br === 'copy') await copyText(brainAns, 'コピーしました');
     else if (d.rv === 'next') await reviewStart();
@@ -1323,19 +1377,74 @@ async function bulkAutoTag() {
   refresh(); renderSettings(); toast(n + '項目にタグを付けました');
 }
 
+/* ───────── 項目の統合（別名つき） ───────── */
+async function mergeEntries(keepId, dropId) {
+  const k = entryById.get(keepId), d = entryById.get(dropId); if (!k || !d || k.id === d.id) return false;
+  const now = Date.now(), rank = { unknown: 0, learning: 1, known: 2 };
+  const moved = (qasByEntry.get(dropId) || []).map(q => Object.assign({}, q, { entryId: keepId, updatedAt: now }));
+  const note = (k.note && d.note && k.note !== d.note) ? k.note + '\n\n（「' + d.term + '」より）\n' + d.note : (k.note || d.note || '');
+  const ku = k.understanding || 'unknown', du = d.understanding || 'unknown';
+  const merged = Object.assign({}, k, {
+    oneLine: k.oneLine || d.oneLine || '', tags: union(k.tags, d.tags), note,
+    related: union(k.related, d.related).filter(t => norm(t) !== norm(k.term) && norm(t) !== norm(d.term)),
+    aliases: union(union(k.aliases, [d.term]), d.aliases).filter(a => norm(a) !== norm(k.term)),
+    understanding: rank[ku] <= rank[du] ? ku : du,
+    kind: (k.kind && k.kind !== 'term') ? k.kind : (d.kind || k.kind || 'term'), updatedAt: now
+  });
+  entries = entries.filter(e => e.id !== dropId); rebuild();
+  await writeEntries([merged]); if (moved.length) await writeQAs(moved);
+  addTomb([dropId]); await idbDel('entries', [dropId]);
+  refresh(); return true;
+}
+const dupBg = new Map();
+function termBg(e) { let b = dupBg.get(e.id + '|' + e.term); if (!b) { b = bigramSet(norm(e.term)); dupBg.set(e.id + '|' + e.term, b); } return b; }
+function dupPairs() {
+  const out = [], arr = entries.slice(0, 600);
+  for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+    const a = arr[i], b = arr[j], an = norm(a.term), bn = norm(b.term); let sc = 0;
+    if (Math.min(an.length, bn.length) >= 3 && (an.includes(bn) || bn.includes(an))) sc = 0.9;
+    else if (an.length >= 3 && bn.length >= 3) { const x = termBg(a), y = termBg(b); let m = 0; x.forEach(g => { if (y.has(g)) m++; }); const u = x.size + y.size - m; if (u && m / u >= 0.6) sc = m / u; }
+    if (!sc) { const ta = (a.tags || []).map(norm), tb = new Set((b.tags || []).map(norm)); const sh = ta.filter(t => tb.has(t)).length; if (sh >= 2 && a.oneLine && b.oneLine) { const x = bigramSet(norm(a.oneLine)), y = bigramSet(norm(b.oneLine)); let m = 0; x.forEach(g => { if (y.has(g)) m++; }); const u = x.size + y.size - m; if (u && m / u >= 0.5) sc = 0.6; } }
+    if (sc) out.push({ a, b, sc });
+  }
+  return out.sort((p, q) => q.sc - p.sc).slice(0, 8);
+}
+function confirmMerge(keepId, dropId) {
+  const k = entryById.get(keepId), d = entryById.get(dropId); if (!k || !d) return Promise.resolve(false);
+  const n = (qasByEntry.get(dropId) || []).length;
+  if (!confirm('「' + d.term + '」を「' + k.term + '」に統合します。\nQ&A ' + n + '件が「' + k.term + '」に移り、「' + d.term + '」は別名になります（[[' + d.term + ']] のリンクも届きます）。\n元に戻せません。よろしいですか？')) return Promise.resolve(false);
+  return mergeEntries(keepId, dropId);
+}
+let mergeFor = null;
+function openMerge(id) { mergeFor = id; $('mgQ').value = ''; drawMerge(); openSheet('shMerge'); }
+function drawMerge() {
+  const e = entryById.get(mergeFor); if (!e) return;
+  $('mgHead').innerHTML = '<div class="lab">残す項目（この項目）</div><b style="font-size:18px">' + esc(e.term) + '</b>' + (e.oneLine ? '<div class="note">' + esc(e.oneLine) + '</div>' : '');
+  const q = $('mgQ').value.trim();
+  const sug = dupPairs().filter(x => x.a.id === e.id || x.b.id === e.id).map(x => x.a.id === e.id ? x.b : x.a);
+  const list = (tokensOf(q).length ? searchEntries(q, 'all', 'all') : sug.concat(entries.filter(o => !sug.includes(o)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)))).filter(o => o.id !== e.id).slice(0, 40);
+  $('mgList').innerHTML = (!q && sug.length ? '<div class="sec-h">似ている項目（上に出しています）</div>' : '') + list.map(o => '<div class="pick-item" data-mg="' + esc(o.id) + '"><b>' + esc(o.term) + '</b>' + (sug.includes(o) && !q ? ' <span class="kbadge">似ている</span>' : '') + (o.oneLine ? '<div class="note">' + esc(o.oneLine) + '</div>' : '') + '<div class="note">Q&amp;A ' + (qasByEntry.get(o.id) || []).length + '件</div></div>').join('') || '<div class="empty">相手になる項目がありません。</div>';
+}
+
 /* ───────── 辞書AI（Worker の /ai 経由。自分の辞書を材料にする） ───────── */
 const bigramsOf = s => { const t = norm(s).replace(/\s+/g, ''), r = new Set(); for (let i = 0; i < t.length - 1; i++) { const g = t.slice(i, i + 2); if (/[^ぁ-ゟー\d\W_]|[A-Za-z]/.test(g) || /[ァ-ヶ一-龥]/.test(g)) r.add(g); } return r; };
 function entryText(e) { return [e.term, (e.tags || []).join(' '), e.oneLine, e.note].concat((qasByEntry.get(e.id) || []).map(q => q.question + ' ' + q.answer + ' ' + (q.judgment || ''))).join('\n'); }
+const rbCache = new Map();
+function entryFields(e) {
+  let c = rbCache.get(e.id); if (c) return c;
+  const f = [[e.term, 6], [(e.tags || []).join(' ') + ' ' + (e.aliases || []).join(' '), 4], [e.oneLine, 3], [e.note, 2]];
+  (qasByEntry.get(e.id) || []).forEach(q => { f.push([q.question, 1.2], [q.answer, 1], [q.judgment, 2]); });
+  c = f.filter(x => x[0]).map(([t, w]) => [bigramsOf(t), w]); rbCache.set(e.id, c); return c;
+}
 function retrieve(query, k) {
   const qn = norm(query), qb = bigramsOf(query);
   const scored = entries.map(e => {
     let s = 0; const tn = norm(e.term);
     if (tn.length >= 2 && qn.includes(tn)) s += 20;
+    (e.aliases || []).forEach(a => { const n = norm(a); if (n.length >= 2 && qn.includes(n)) s += 15; });
     (e.tags || []).forEach(t => { const n = norm(t); if (n.length >= 2 && qn.includes(n)) s += 8; });
     if (qb.size) {
-      const fields = [[e.term, 6], [(e.tags || []).join(' '), 4], [e.oneLine, 3], [e.note, 2]];
-      (qasByEntry.get(e.id) || []).forEach(q => { fields.push([q.question, 1.2], [q.answer, 1], [q.judgment, 2]); });
-      for (const [txt, w] of fields) { if (!txt) continue; const bs = bigramsOf(txt); let h = 0; qb.forEach(g => { if (bs.has(g)) h++; }); s += w * (h / qb.size) * 10; }
+      for (const [bs, w] of entryFields(e)) { let h = 0; qb.forEach(g => { if (bs.has(g)) h++; }); s += w * (h / qb.size) * 10; }
     }
     return { e, s };
   }).filter(x => x.s >= 3).sort((a, b) => b.s - a.s);
@@ -1352,6 +1461,20 @@ function material(e, budget) {
   qs.forEach(q => { t += '\nQ：' + q.question.slice(0, 150) + '\nA：' + q.answer.slice(0, 500) + (q.judgment ? '\n自分の判断：' + q.judgment.slice(0, 250) : ''); });
   return t.slice(0, budget || 1400);
 }
+
+// 言い換えへの対応：局所検索で材料が少ないとき、辞書の語彙（見出し語・タグ）の中から、AIに関係しそうな語を選ばせる
+async function expandQuery(q) {
+  const cnt = new Map(); entries.forEach(e => (e.tags || []).forEach(t => cnt.set(t, (cnt.get(t) || 0) + 1)));
+  const vocab = [...new Set(entries.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 250).map(e => e.term).concat([...cnt.entries()].sort((a, b) => b[1] - a[1]).slice(0, 80).map(x => x[0])))];
+  const raw = await callAI(redact('次の質問に関係しそうな語を、下の「辞書の語彙」から選んでください。言い換え・同義語・上位概念も考えてください。\nJSONだけを返してください: {"terms":["語彙にある語（最大8）"],"keywords":["質問の言い換え・同義語（語彙になくてもよい・最大6）"]}\n\n【辞書の語彙】\n' + vocab.join(', ') + '\n\n【質問】\n' + q).text, { maxTokens: 300 });
+  const a = raw.indexOf('{'), b = raw.lastIndexOf('}'); const o = JSON.parse(raw.slice(a, b + 1));
+  const extra = [], seen = new Set(), push = e => { if (e && !seen.has(e.id)) { seen.add(e.id); extra.push(e); } };
+  (Array.isArray(o.terms) ? o.terms : []).slice(0, 8).forEach(t => {
+    const e = findEntryByTerm(String(t)); if (e) { push(e); return; }
+    entries.filter(x => (x.tags || []).some(g => norm(g) === norm(t))).slice(0, 3).forEach(push);
+  });
+  return { extra, keywords: (Array.isArray(o.keywords) ? o.keywords : []).map(x => String(x)).slice(0, 6) };
+}
 let brainBusy = false, brainSrc = [], brainAns = '', brainQ = '';
 function brainMeta() { const c = aiConfig(); $('brMeta').innerHTML = (c.endpoint && c.token) ? esc(usageLine()) : '<br>⚠️ AIの接続が未設定です。⚙︎ 設定から入れてください。'; }
 function openBrain() { brainMeta(); drawGaps(); openSheet('shBrain'); }
@@ -1359,8 +1482,18 @@ async function brainAsk() {
   if (brainBusy) return;
   const q = $('bQ').value.trim(); if (!q) { toast('質問を入れてください'); return; }
   if (!entries.length) { $('bOut').innerHTML = '<div class="banner">辞書がまだ空です。先にQ&amp;Aを足してください。</div>'; return; }
-  const src = retrieve(q, 6);
-  if (!src.length) { $('bOut').innerHTML = '<div class="banner">この質問に関係しそうな項目が、辞書に見つかりませんでした。通常の「🤖AIに聞く」で聞いて、辞書に足せます。（AIには送っていません）</div>'; return; }
+  let src = retrieve(q, 6), viaExpand = false;
+  if (src.length < 3) {   // 材料が少ない：言い換えで探し直す（AIを1回、少量だけ使う）
+    brainBusy = true; $('btnBrainAsk').disabled = true; $('btnBrainAsk').textContent = '🧠 言い換えで探しています…';
+    try {
+      const ex = await expandQuery(q);
+      const more = retrieve(q + ' ' + ex.keywords.join(' '), 6), seen = new Set(src.map(e => e.id));
+      [...ex.extra, ...more].forEach(e => { if (!seen.has(e.id) && src.length < 8) { seen.add(e.id); src.push(e); } });
+      viaExpand = src.length > 0;
+    } catch (_) { /* 失敗したら、局所検索の結果だけで続ける */ }
+    brainBusy = false; $('btnBrainAsk').disabled = false; $('btnBrainAsk').textContent = '🧠 辞書に聞く';
+  }
+  if (!src.length) { $('bOut').innerHTML = '<div class="banner">この質問に関係しそうな項目が、辞書に見つかりませんでした。通常の「🤖AIに聞く」で聞いて、辞書に足せます。（答えはAIに聞いていません）</div>'; return; }
   let mat = ''; for (const e of src) { const m = material(e, 1400); if ((mat + m).length > 7500) break; mat += m + '\n\n'; }
   const prompt = redact('あなたは、私の個人辞書だけを根拠に答えるアシスタントです。\nルール:\n- 下の【辞書の材料】に書かれていることだけで答える。書かれていないことを推測で足さない\n- 根拠にした項目は、文中で [[見出し語]] の形で示す\n- 「自分の判断」「自分の理解」があれば、AIの回答より優先して示す\n- 材料で足りないときは「辞書には無い」と言い、そのうえで末尾に「（辞書の外・一般知識）」と明記して、短く補足してよい\n- 日本語で、結論から簡潔に\n\n【辞書の材料】\n' + mat + '【質問】\n' + q).text;
   brainBusy = true; $('btnBrainAsk').disabled = true; $('btnBrainAsk').textContent = '🧠 考え中…（最大90秒）'; $('bOut').innerHTML = '';
@@ -1370,7 +1503,7 @@ async function brainAsk() {
   if (err) { $('bOut').innerHTML = '<div class="banner">' + esc(err) + '</div>'; return; }
   brainSrc = src; brainAns = ans; brainQ = q;
   $('bOut').innerHTML = '<div class="br-card"><div class="lab" style="margin-top:0">答え</div><div>' + rich(ans) + '</div></div>' +
-    '<div class="sec-h">根拠として渡した項目（押すと開きます）</div><div class="br-src">' + src.map(e => '<button class="tagbtn has" data-open="' + esc(e.id) + '">📖 ' + esc(e.term) + '</button>').join('') + '</div>' +
+    '<div class="sec-h">根拠として渡した項目（押すと開きます）' + (viaExpand ? '　<span class="kbadge">言い換えで探しました</span>' : '') + '</div><div class="br-src">' + src.map(e => '<button class="tagbtn has" data-open="' + esc(e.id) + '">📖 ' + esc(e.term) + '</button>').join('') + '</div>' +
     '<div class="row" style="margin-top:8px"><button class="btn" data-br="save">📌 この答えを項目として残す</button><button class="btn" data-br="copy">📋 コピー</button></div>';
 }
 async function brainSave() {
@@ -1436,7 +1569,7 @@ async function reviewSetUnd(k) {
 
 /* 知識の穴（端末の中だけ） */
 function drawGaps() {
-  const termSet = new Set(entries.map(e => norm(e.term))), refs = new Map();
+  const termSet = new Set(); entries.forEach(e => { termSet.add(norm(e.term)); (e.aliases || []).forEach(a => termSet.add(norm(a))); }); const refs = new Map();
   for (const e of entries) for (const [n, raw] of (outLinks.get(e.id) || new Map())) { if (termSet.has(n)) continue; const o = refs.get(n) || { raw, c: 0 }; o.c++; refs.set(n, o); }
   const missing = [...refs.values()].sort((a, b) => b.c - a.c).slice(0, 8);
   const hot = entries.filter(e => (e.understanding || 'unknown') === 'unknown').map(e => ({ e, n: (inLinks.get(e.id) || new Set()).size + (e.related || []).length * 0.3 })).filter(x => x.n >= 1).sort((a, b) => b.n - a.n).slice(0, 6);
@@ -1445,6 +1578,8 @@ function drawGaps() {
   h += '<div class="sec-h" style="margin-top:0">まだ項目がない言葉（よく出てくる順。押すと作れます）</div>' + (missing.length ? '<div>' + missing.map(m => '<button class="wl unres" data-wl="' + esc(m.raw) + '" style="font-size:15px;padding:4px 6px">' + esc(m.raw) + (m.c > 1 ? '×' + m.c : '') + '</button>').join(' ') + '</div>' : '<div class="note">なし</div>');
   h += '<div class="sec-h">未理解なのに、よく参照されている項目</div>' + (hot.length ? hot.map(x => '<div class="card" data-open="' + esc(x.e.id) + '" style="margin:6px 0"><span class="c-term" style="font-size:16px">' + esc(x.e.term) + '</span><div class="c-meta">参照されている数：' + (inLinks.get(x.e.id) || new Set()).size + '　関連用語：' + (x.e.related || []).length + '</div></div>').join('') : '<div class="note">なし</div>');
   h += '<div class="sec-h">どこともつながっていない項目</div>' + (lone.length ? '<div>' + lone.map(e => '<button class="tagbtn" data-open="' + esc(e.id) + '">' + esc(e.term) + '</button>').join('') + '</div><div class="note">タグも[[リンク]]も無い項目です。⚙︎ の「タグの自動付け」や、項目の「🔗 AIでつながりを探す」が使えます。</div>' : '<div class="note">なし</div>');
+  const dp = dupPairs();
+  h += '<div class="sec-h">統合できそうな項目（似た見出し語）</div>' + (dp.length ? dp.map((x, i) => '<div class="br-card"><b>' + esc(x.a.term) + '</b> ⇄ <b>' + esc(x.b.term) + '</b><div class="row" style="margin-top:6px"><button class="btn sm" data-mgpair="' + esc(x.a.id) + '|' + esc(x.b.id) + '">統合する…</button><button class="btn sm" data-open="' + esc(x.a.id) + '">左を開く</button></div></div>').join('') : '<div class="note">なし</div>');
   $('gapBox').innerHTML = h;
 }
 
@@ -1558,6 +1693,7 @@ async function init() {
   catch (e) { memOnly = true; db = null; entries = []; qas = []; }
   rebuild(); refresh();
   if (lsGet('kd_sync') === '1' && syncReady()) void kdSync(false);
+  if (lsGet('kd_qrauto') === '1' && syncReady()) void qrCloudImport(true);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 init();
