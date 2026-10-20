@@ -114,6 +114,16 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
 .br-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
 .br-src{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .vd-ok{color:var(--knw);font-weight:800}.vd-partial{color:var(--lrn);font-weight:800}.vd-ng{color:var(--unk);font-weight:800}
+.bar-bg{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:4px}
+.bar-fg{height:100%;background:var(--knw)}
+.step{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+.step.next{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.step .st-t{flex:1;font-size:15px}
+details.cat{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:10px 0;padding:0 12px}
+details.cat>summary{padding:12px 0;font-weight:800;cursor:pointer;list-style:none;font-size:17px}
+details.cat>summary::-webkit-details-marker{display:none}
+.sub-h{font-size:13px;color:var(--sub);margin:10px 0 2px;font-weight:700}
+.lvl{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-right:6px}
 </style>
 </head>
 <body>
@@ -121,6 +131,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
   <div class="top">
     <div class="top-row">
       <div class="title">📖 知識辞書</div>
+      <button class="icon-btn" id="btnSys" aria-label="体系・学習">📚</button>
       <button class="icon-btn" id="btnBrain" aria-label="辞書AI">🧠</button>
       <button class="icon-btn" id="btnGraph" aria-label="つながり">🕸</button>
       <button class="icon-btn" id="btnSettings" aria-label="設定とバックアップ">⚙︎</button>
@@ -164,6 +175,9 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
     <label class="lab" for="eeKind">種類</label><select id="eeKind"><option value="term">用語（言葉の意味）</option><option value="howto">手順（やり方の流れ）</option><option value="idea">考え方（判断の理由・方針）</option></select>
     <label class="lab" for="eeOne">一言説明</label><input id="eeOne" maxlength="120" placeholder="例：APIの認証に使うトークン形式">
     <label class="lab" for="eeTags">タグ（カンマか空白で区切る）</label><input id="eeTags" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="lab" for="eeCat">分野（例：Web/認証。「/」で小分野。空なら未分類）</label><input id="eeCat" maxlength="45" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="lab" for="eeLvl">レベル</label><select id="eeLvl"><option value="">未設定</option><option value="1">基礎</option><option value="2">応用</option><option value="3">発展</option></select>
+    <label class="lab" for="eePre">前提にする項目（先に分かっているべき語。カンマで区切る）</label><input id="eePre" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="lab" for="eeAlias">別名（統合した語など。カンマで区切る。[[別名]]のリンクもこの項目に届きます）</label><input id="eeAlias" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="lab" for="eeRel">関連用語（カンマか空白で区切る）</label><input id="eeRel" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="lab" for="eeNote" style="display:flex;justify-content:space-between;align-items:center">自分の理解（自分の言葉で。手順は「1. 2. 3.」の行で） <button class="btn sm" type="button" data-linkpick="eeNote">🔗 リンク</button></label><textarea id="eeNote" rows="6" placeholder="例：1. [[JWT]] を発行する&#10;2. [[Cookie]] に入れる"></textarea>
@@ -204,6 +218,21 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
   </div>
 </div>
 
+<!-- 体系・学習 -->
+<div class="sheet" id="shSys">
+  <div class="sh-head"><button id="sysClose">閉じる</button><h2>📚 体系・学習</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <div class="box" style="margin-top:0">
+      <div class="lab">学習のサイクル（集める → 整える → 体系にする → 復習する → また集める）</div>
+      <div id="sysStudy" class="note"></div>
+      <div id="sysSteps"></div>
+    </div>
+    <div id="sysCand"></div>
+    <div class="lab">知識の体系（分野ごと）</div>
+    <div id="sysTree"></div>
+  </div>
+</div>
+
 <!-- 項目の統合 -->
 <div class="sheet" id="shMerge">
   <div class="sh-head"><button id="mgClose">閉じる</button><h2>項目を統合する</h2><span style="min-width:56px"></span></div>
@@ -229,7 +258,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
     </div>
     <div class="box">
       <div class="lab">復習（理解度チェック）</div>
-      <button class="btn wide" id="btnReview">🎓 未理解の項目から1問出す</button>
+      <button class="btn wide" id="btnReview">🎓 今日の復習から1問出す</button>
       <div class="note">自分の言葉で答えると、AIが辞書の内容と照らして採点します。</div>
       <div id="rvBox"></div>
     </div>
@@ -341,7 +370,7 @@ input[type=checkbox]{width:22px;height:22px;flex:none;padding:0}
 
 <script>
 'use strict';
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.7.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -583,6 +612,10 @@ function openEntry(id) {
   const rel = entries.filter(o => o.id !== id).map(o => { const sh = (o.tags || []).filter(t => mine.has(norm(t))); return { o, n: sh.length, sh }; }).filter(x => x.n > 0)
     .sort((a, b) => (b.n - a.n) || ((b.o.updatedAt || 0) - (a.o.updatedAt || 0))).slice(0, 8);
   let h = '<div class="v-term">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge" style="font-size:12px">' + KIND[e.kind] + '</span>' : '') + esc(e.term) + '</div>';
+  if (e.cat || (e.prereq || []).length) {
+    h += '<div style="margin:6px 0">' + (e.cat ? '<span class="kbadge" style="font-size:12px">📚 ' + esc(e.cat) + '</span>' : '') + (e.lvl ? '<span class="lvl">' + LVL[e.lvl] + '</span>' : '') + '</div>';
+    if ((e.prereq || []).length) h += '<div class="note">前提：</div><div>' + e.prereq.map(t => { const p = findEntryByTerm(t), ok = p && p.understanding === 'known'; return '<button class="tagbtn' + (p ? ' has' : '') + '" data-rel="' + esc(t) + '">' + (ok ? '✅ ' : p ? '⚠️ ' : '') + esc(t) + '</button>'; }).join('') + '</div>';
+  }
   if ((e.aliases || []).length) h += '<div class="note">別名：' + e.aliases.map(esc).join('、') + '</div>';
   if (e.oneLine) h += '<div style="font-size:17px;margin-top:4px">' + rich(e.oneLine) + '</div>';
   h += '<div class="und-row">' + ['unknown', 'learning', 'known'].map(k => '<button class="und-' + k + (u === k ? ' on' : '') + '" data-und="' + k + '">' + UND[k] + '</button>').join('') + '</div>';
@@ -627,7 +660,7 @@ async function setUnderstanding(k) {
 function openEntryEdit() {
   const e = entryById.get(viewId); if (!e) return;
   $('eeTerm').value = e.term; $('eeOne').value = e.oneLine || ''; $('eeTags').value = (e.tags || []).join(' ');
-  $('eeAlias').value = (e.aliases || []).join('、'); $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || ''; $('eeKind').value = e.kind || 'term';
+  $('eeCat').value = e.cat || ''; $('eeLvl').value = e.lvl ? String(e.lvl) : ''; $('eePre').value = (e.prereq || []).join('、'); $('eeAlias').value = (e.aliases || []).join('、'); $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || ''; $('eeKind').value = e.kind || 'term';
   openSheet('shEntryEdit');
 }
 async function saveEntryEdit() {
@@ -635,7 +668,7 @@ async function saveEntryEdit() {
   const term = $('eeTerm').value.trim(); if (!term) { toast('見出し語を入れてください'); return; }
   const other = findEntryByTerm(term);
   if (other && other.id !== e.id) { toast('同じ見出し語の項目があります。名前を変えてください'); return; }
-  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), aliases: splitAlias($('eeAlias').value), note: $('eeNote').value.trim(), kind: $('eeKind').value, updatedAt: Date.now() })]);
+  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), aliases: splitAlias($('eeAlias').value), cat: cleanCat($('eeCat').value), lvl: Number($('eeLvl').value) || 0, prereq: splitAlias($('eePre').value).filter(t => norm(t) !== norm(term)), note: $('eeNote').value.trim(), kind: $('eeKind').value, updatedAt: Date.now() })]);
   closeSheet('shEntryEdit'); openEntry(viewId); refresh(); toast('保存しました');
 }
 async function deleteEntry() {
@@ -1289,6 +1322,19 @@ function wire() {
   $('btnImportQR').addEventListener('click', () => $('fileQR').click());
   $('fileOwn').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importOwn(f); });
   $('fileQR').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importQuickRef(f); });
+  $('btnSys').addEventListener('click', openSys);
+  $('sysClose').addEventListener('click', () => closeSheet('shSys'));
+  $('shSys').addEventListener('click', async ev => {
+    const t = ev.target.closest('[data-sys],[data-syscat],[data-open]'); if (!t) return; const d = t.dataset;
+    if (d.open) { openEntry(d.open); return; }
+    if (d.syscat) { rvCat = d.syscat; openBrain(); await reviewStart(); return; }
+    if (d.sys === 'import') { await qrCloudImport(false); drawSysSteps(); drawSysTree(); }
+    else if (d.sys === 'tidy') { if (entries.some(e => !(e.tags || []).length)) { await bulkAutoTag(); drawSysSteps(); } else openBrain(); }
+    else if (d.sys === 'systemize') await systemizeRun();
+    else if (d.sys === 'adopt') await sysAdopt();
+    else if (d.sys === 'drop') { sysCand = null; drawSysCand(''); }
+    else if (d.sys === 'review') { rvCat = ''; openBrain(); await reviewStart(); }
+  });
   $('mgClose').addEventListener('click', () => closeSheet('shMerge'));
   $('mgQ').addEventListener('input', drawMerge);
   $('mgList').addEventListener('click', async ev => {
@@ -1296,9 +1342,9 @@ function wire() {
     if (await confirmMerge(mergeFor, it.dataset.mg)) { closeSheet('shMerge'); openEntry(mergeFor); toast('統合しました'); }
   });
   $('btnBrain').addEventListener('click', openBrain);
-  $('brClose').addEventListener('click', () => closeSheet('shBrain'));
+  $('brClose').addEventListener('click', () => { closeSheet('shBrain'); if ($('shSys').classList.contains('open')) { drawSysSteps(); drawSysTree(); } });
   $('btnBrainAsk').addEventListener('click', () => { void brainAsk(); });
-  $('btnReview').addEventListener('click', () => { void reviewStart(); });
+  $('btnReview').addEventListener('click', () => { rvCat = ''; void reviewStart(); });
   $('btnSaveOrg').addEventListener('click', () => { lsSet('kd_autoorg', $('sAutoOrg').checked ? '1' : '0'); toast($('sAutoOrg').checked ? '保存時のAI整理：オン' : '保存時のAI整理：オフ'); });
   $('shBrain').addEventListener('click', async e => {
     const t = e.target.closest('[data-open],[data-wl],[data-br],[data-rv],[data-rvund],[data-mgpair],#btnGrade'); if (!t) return;
@@ -1388,6 +1434,7 @@ async function mergeEntries(keepId, dropId) {
     oneLine: k.oneLine || d.oneLine || '', tags: union(k.tags, d.tags), note,
     related: union(k.related, d.related).filter(t => norm(t) !== norm(k.term) && norm(t) !== norm(d.term)),
     aliases: union(union(k.aliases, [d.term]), d.aliases).filter(a => norm(a) !== norm(k.term)),
+    cat: k.cat || d.cat || '', lvl: k.lvl || d.lvl || 0, prereq: union(k.prereq, d.prereq).filter(t => norm(t) !== norm(k.term) && norm(t) !== norm(d.term)),
     understanding: rank[ku] <= rank[du] ? ku : du,
     kind: (k.kind && k.kind !== 'term') ? k.kind : (d.kind || k.kind || 'term'), updatedAt: now
   });
@@ -1424,6 +1471,106 @@ function drawMerge() {
   const sug = dupPairs().filter(x => x.a.id === e.id || x.b.id === e.id).map(x => x.a.id === e.id ? x.b : x.a);
   const list = (tokensOf(q).length ? searchEntries(q, 'all', 'all') : sug.concat(entries.filter(o => !sug.includes(o)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)))).filter(o => o.id !== e.id).slice(0, 40);
   $('mgList').innerHTML = (!q && sug.length ? '<div class="sec-h">似ている項目（上に出しています）</div>' : '') + list.map(o => '<div class="pick-item" data-mg="' + esc(o.id) + '"><b>' + esc(o.term) + '</b>' + (sug.includes(o) && !q ? ' <span class="kbadge">似ている</span>' : '') + (o.oneLine ? '<div class="note">' + esc(o.oneLine) + '</div>' : '') + '<div class="note">Q&amp;A ' + (qasByEntry.get(o.id) || []).length + '件</div></div>').join('') || '<div class="empty">相手になる項目がありません。</div>';
+}
+
+/* ───────── 体系・学習（分野・前提・レベルで知識を体系にし、復習を回す） ───────── */
+const LVL = { 1: '基礎', 2: '応用', 3: '発展' };
+const catOf = e => String(e.cat || '').trim();
+function cleanCat(c) { return String(c || '').split('/').map(x => x.replace(/\s+/g, '').slice(0, 20)).filter(Boolean).slice(0, 2).join('/'); }
+const inCat = (e, c) => !c || catOf(e) === c || catOf(e).startsWith(c + '/');
+const hasContent = e => !!(e.note || (qasByEntry.get(e.id) || []).length);
+const prereqOk = e => (e.prereq || []).every(t => { const p = findEntryByTerm(t); return !p || p.understanding === 'known'; });
+function isDue(e, now) { return e.nextAt ? e.nextAt <= now : (e.understanding || 'unknown') !== 'known'; }
+function dueList(cat) {
+  const now = Date.now(), rk = { unknown: 0, learning: 1, known: 2 };
+  return entries.filter(e => hasContent(e) && inCat(e, cat) && isDue(e, now))
+    .sort((a, b) => (prereqOk(b) - prereqOk(a)) || ((a.lvl || 2) - (b.lvl || 2)) || (rk[a.understanding || 'unknown'] - rk[b.understanding || 'unknown']) || ((a.checkedAt || 0) - (b.checkedAt || 0)));
+}
+// 学習ログ（端末の中だけ）
+function studyLog() { try { return JSON.parse(lsGet('kd_study') || '{}') || {}; } catch (_) { return {}; } }
+function logStudy() { const l = studyLog(), d = todayStr(); l[d] = (l[d] || 0) + 1; lsSet('kd_study', JSON.stringify(l)); }
+function studyLine() {
+  const l = studyLog(), t = l[todayStr()] || 0; let streak = 0; const d = new Date();
+  if (!t) d.setDate(d.getDate() - 1);
+  for (;;) { const p = n => String(n).padStart(2, '0'), k = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); if (l[k]) { streak++; d.setDate(d.getDate() - 1); } else break; }
+  const total = Object.values(l).reduce((a, b) => a + b, 0);
+  const known = entries.filter(e => e.understanding === 'known').length;
+  return '今日 ' + t + '問　連続 ' + streak + '日　これまで ' + total + '問　理解済み ' + known + '／' + entries.length + '項目';
+}
+function drawSysSteps() {
+  const un = entries.filter(e => !catOf(e)).length, notag = entries.filter(e => !(e.tags || []).length).length, dup = entries.length > 1 ? dupPairs().length : 0, due = dueList('').length;
+  const steps = [
+    { id: 'import', t: '① 集める：quick-ref の新しいAI Q&Aを取り込む', b: '☁️ 取り込む', n: -1 },
+    { id: 'tidy', t: '② 整える：タグのない項目 ' + notag + '件／統合できそうな項目 ' + dup + '組', b: notag ? '🏷 タグを付ける' : '🔀 統合候補を見る', n: notag + dup },
+    { id: 'systemize', t: '③ 体系にする：分野のない項目 ' + un + '件', b: '📚 AIで体系に入れる', n: un },
+    { id: 'review', t: '④ 復習する：今日の復習 ' + due + '件', b: '🎓 復習する', n: due }
+  ];
+  const nextId = (steps.find(x => x.n > 0) || {}).id;
+  $('sysSteps').innerHTML = steps.map(x => '<div class="step' + (x.id === nextId ? ' next' : '') + '"><div class="st-t">' + esc(x.t) + (x.id === nextId ? ' <span class="kbadge">次はこれ</span>' : '') + '</div><button class="btn sm" data-sys="' + x.id + '">' + esc(x.b) + '</button></div>').join('') +
+    (nextId ? '' : '<div class="note">今日の分はひと通り終わりました。新しいQ&amp;Aを足すと、また回ります。</div>');
+  $('sysStudy').textContent = studyLine();
+}
+function drawSysTree() {
+  const groups = new Map();
+  for (const e of entries) { const c = catOf(e); if (!c) continue; const [top, sub] = c.split('/'); if (!groups.has(top)) groups.set(top, new Map()); const g = groups.get(top); const k = sub || ''; if (!g.has(k)) g.set(k, []); g.get(k).push(e); }
+  const rowSort = (a, b) => ((a.lvl || 2) - (b.lvl || 2)) || ((a.prereq || []).length - (b.prereq || []).length) || a.term.localeCompare(b.term);
+  let h = '';
+  for (const top of [...groups.keys()].sort()) {
+    const all = [...groups.get(top).values()].flat(), kn = all.filter(e => e.understanding === 'known').length, pct = Math.round(kn / all.length * 100);
+    h += '<details class="cat" open><summary>' + esc(top) + ' <span class="note" style="font-weight:400">理解済み ' + kn + '／' + all.length + '</span><div class="bar-bg"><div class="bar-fg" style="width:' + pct + '%"></div></div></summary>';
+    h += '<div class="row" style="margin:6px 0"><button class="btn sm" data-syscat="' + esc(top) + '">▶ この分野を復習</button></div>';
+    for (const sub of [...groups.get(top).keys()].sort()) {
+      if (sub) h += '<div class="sub-h">' + esc(sub) + '</div>';
+      h += groups.get(top).get(sub).sort(rowSort).map(e => {
+        const u = e.understanding || 'unknown', warn = (e.prereq || []).filter(t => { const p = findEntryByTerm(t); return p && p.understanding !== 'known'; });
+        return '<div class="card" data-open="' + esc(e.id) + '" style="margin:6px 0"><div class="c-top"><span class="c-term" style="font-size:16px">' + (e.lvl ? '<span class="lvl">' + LVL[e.lvl] + '</span>' : '') + esc(e.term) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' +
+          (warn.length ? '<div class="c-meta">⚠️ 先に：' + warn.map(esc).join('、') + '</div>' : '') + '</div>';
+      }).join('');
+    }
+    h += '</details>';
+  }
+  const un = entries.filter(e => !catOf(e));
+  h += un.length ? '<details class="cat"><summary>未分類 <span class="note" style="font-weight:400">' + un.length + '件</span></summary><div style="padding-bottom:10px">' + un.slice(0, 80).map(e => '<button class="tagbtn" data-open="' + esc(e.id) + '">' + esc(e.term) + '</button>').join('') + '</div></details>' : '';
+  $('sysTree').innerHTML = h || '<div class="empty">まだ体系がありません。上の「③ 体系にする」で、AIが分野・レベル・前提を提案します。</div>';
+}
+function openSys() { drawSysSteps(); drawSysTree(); openSheet('shSys'); }
+
+let sysCand = null, sysBusy = false;
+async function systemizeRun() {
+  if (sysBusy) return;
+  const targets = entries.filter(e => !catOf(e)); if (!targets.length) { toast('分野のない項目はありません'); return; }
+  const B = 40, nb = Math.ceil(targets.length / B);
+  if (!confirm('分野のない ' + targets.length + '項目を、' + nb + '回に分けてAIに送り、分野・レベル・前提の候補を作ります（API ' + nb + '回分）。結果は候補で、採用するまで入りません。よろしいですか？')) return;
+  sysBusy = true; const cands = [], bad = []; const cats = new Set(entries.map(catOf).filter(Boolean));
+  const vocab = entries.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 200).map(e => e.term);
+  for (let i = 0; i < nb; i++) {
+    $('sysCand').innerHTML = '<div class="note">AIが体系を考えています… ' + (i + 1) + '/' + nb + '</div>';
+    const part = targets.slice(i * B, (i + 1) * B);
+    const lines = part.map(e => '・' + e.term + '｜' + (e.oneLine || '').slice(0, 40) + '｜' + (e.tags || []).join(' ')).join('\n');
+    try {
+      const raw = await callAI(redact('次の項目を、知識の体系（分野・レベル・前提）に整理してください。\nJSONだけを返してください: {"items":[{"term":"項目の見出し語（そのまま）","cat":"分野/小分野","lvl":1,"prereq":["前提にする語"]}]}\nルール:\n- cat は「分野」または「分野/小分野」（日本語で各20字以内・最大2階層）。【既存の分野】に合えばそれを使い、むやみに増やさない\n- lvl は 1=基礎、2=応用、3=発展\n- prereq は、その項目を理解する前に知っているべき語。0〜3個。必ず【辞書の語彙】にある語だけ。なければ空\n- 【整理する項目】のすべてを返す\n\n【既存の分野】\n' + ([...cats].join(', ') || '（まだなし）') + '\n\n【辞書の語彙】\n' + vocab.join(', ') + '\n\n【整理する項目】\n' + lines).text, { maxTokens: 3000 });
+      const a = raw.indexOf('{'), b = raw.lastIndexOf('}'); const o = JSON.parse(raw.slice(a, b + 1));
+      for (const it of (Array.isArray(o.items) ? o.items : [])) {
+        const e = findEntryByTerm(String(it && it.term || '')); if (!e || catOf(e) || cands.some(c => c.e.id === e.id)) continue;
+        const cat = cleanCat(it.cat); if (!cat) continue; cats.add(cat);
+        const pre = (Array.isArray(it.prereq) ? it.prereq : []).map(t => findEntryByTerm(String(t))).filter(x => x && x.id !== e.id).map(x => x.term).slice(0, 3);
+        cands.push({ e, cat, lvl: [1, 2, 3].includes(Number(it.lvl)) ? Number(it.lvl) : 2, prereq: [...new Set(pre)] });
+      }
+    } catch (x) { bad.push(i + 1); if (x && /上限|トークン|未設定/.test(x.message || '')) { toast((x.message || '').slice(0, 80)); break; } }
+  }
+  sysBusy = false; sysCand = cands; drawSysCand(bad.length ? bad.length + '回分は読み取れませんでした。もう一度押すと、残りを続けます。' : '');
+}
+function drawSysCand(msg) {
+  const c = sysCand; if (!c || !c.length) { $('sysCand').innerHTML = msg ? '<div class="banner">' + esc(msg) + '</div>' : ''; return; }
+  const g = new Map(); c.forEach(x => { if (!g.has(x.cat)) g.set(x.cat, []); g.get(x.cat).push(x); });
+  $('sysCand').innerHTML = '<div class="cand"><b style="color:#d98a00">✦ AIの体系案</b><span class="note">（' + c.length + '項目。まだ入っていません）</span>' + (msg ? '<div class="note">' + esc(msg) + '</div>' : '') +
+    '<div class="row" style="margin:8px 0"><button class="btn pri" data-sys="adopt">✓ すべて採用</button><button class="btn" data-sys="drop">やめる</button></div>' +
+    [...g.keys()].sort().map(k => '<div class="sub-h">' + esc(k) + '（' + g.get(k).length + '）</div><div>' + g.get(k).map(x => '<span class="tag">' + (x.lvl ? LVL[x.lvl] + '・' : '') + esc(x.e.term) + (x.prereq.length ? ' ←' + x.prereq.map(esc).join(',') : '') + '</span>').join('') + '</div>').join('') + '</div>';
+}
+async function sysAdopt() {
+  const c = sysCand; if (!c || !c.length) return; const now = Date.now();
+  await writeEntries(c.map(x => { const e = entryById.get(x.e.id) || x.e; return Object.assign({}, e, { cat: x.cat, lvl: x.lvl, prereq: x.prereq, updatedAt: now }); }));
+  sysCand = null; refresh(); drawSysCand(''); drawSysSteps(); drawSysTree(); toast('体系に入れました');
 }
 
 /* ───────── 辞書AI（Worker の /ai 経由。自分の辞書を材料にする） ───────── */
@@ -1518,17 +1665,14 @@ async function brainSave() {
 }
 
 /* 復習 */
-let rv = null;
+let rv = null, rvCat = '';
 function pickReview() {
-  const cand = entries.filter(e => (e.understanding || 'unknown') !== 'known' && (e.note || (qasByEntry.get(e.id) || []).length));
-  if (!cand.length) return null;
-  const rank = e => ((e.understanding || 'unknown') === 'unknown' ? 0 : 1e13) + (e.checkedAt || 0);
-  cand.sort((a, b) => rank(a) - rank(b));
+  const cand = dueList(rvCat); if (!cand.length) return null;
   const skip = rv ? rv.skip : new Set(); return cand.find(e => !skip.has(e.id)) || cand[0];
 }
 async function reviewStart() {
   if (brainBusy) return;
-  const e = pickReview(); if (!e) { $('rvBox').innerHTML = '<div class="note">復習できる項目がありません（未理解・理解中で、中身のある項目）。</div>'; return; }
+  const e = pickReview(); if (!e) { $('rvBox').innerHTML = '<div class="note">' + (rvCat ? '「' + esc(rvCat) + '」で' : '') + '今日復習する項目はありません（中身のある項目が、復習の時期になると出ます）。</div>'; return; }
   const skip = rv ? rv.skip : new Set(); skip.add(e.id);
   brainBusy = true; $('btnReview').disabled = true; $('rvBox').innerHTML = '<div class="note">問題を作っています…</div>';
   let q = '', err = '';
@@ -1563,8 +1707,9 @@ async function reviewGrade() {
 }
 async function reviewSetUnd(k) {
   const e = rv && entryById.get(rv.id); if (!e) return;
-  await writeEntries([Object.assign({}, e, { understanding: k, checkedAt: Date.now(), updatedAt: Date.now() })]);
-  refresh(); toast('「' + e.term + '」を「' + UND[k] + '」にしました'); void reviewStart();
+  const now = Date.now(), streak = k === 'known' ? Math.min((e.rvStreak || 0) + 1, 4) : 0, days = k === 'known' ? [0, 3, 7, 14, 30][streak] : (k === 'learning' ? 1 : 0);
+  await writeEntries([Object.assign({}, e, { understanding: k, checkedAt: now, rvStreak: streak, rvCount: (e.rvCount || 0) + 1, nextAt: now + days * 86400000, updatedAt: now })]);
+  logStudy(); refresh(); toast('「' + e.term + '」を「' + UND[k] + '」に。' + (days ? days + '日後にまた出ます' : 'すぐまた出ます')); void reviewStart();
 }
 
 /* 知識の穴（端末の中だけ） */
