@@ -124,6 +124,11 @@ details.cat>summary{padding:12px 0;font-weight:800;cursor:pointer;list-style:non
 details.cat>summary::-webkit-details-marker{display:none}
 .sub-h{font-size:13px;color:var(--sub);margin:10px 0 2px;font-weight:700}
 .lvl{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-right:6px}
+.shelf{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:0 12px}
+.shelf>summary{padding:10px 0;cursor:pointer;list-style:none;font-weight:700}
+.shelf>summary::-webkit-details-marker{display:none}
+.shelf .cnt{font-weight:400;color:var(--sub);font-size:13px}
+.rec{background:var(--warn);border:1px solid var(--warn-line);border-radius:12px;padding:8px 12px;margin:6px 0;font-size:14px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -131,6 +136,7 @@ details.cat>summary::-webkit-details-marker{display:none}
   <div class="top">
     <div class="top-row">
       <div class="title">📖 知識辞書</div>
+      <button class="icon-btn" id="btnLib" aria-label="書庫">🗄</button>
       <button class="icon-btn" id="btnSys" aria-label="体系・学習">📚</button>
       <button class="icon-btn" id="btnBrain" aria-label="辞書AI">🧠</button>
       <button class="icon-btn" id="btnGraph" aria-label="つながり">🕸</button>
@@ -215,6 +221,18 @@ details.cat>summary::-webkit-details-marker{display:none}
     <select id="qSource"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="gemini">Gemini</option><option value="openai">OpenAI(API)</option><option value="perplexity">Perplexity</option><option value="cursor">Cursor</option><option value="manual">手入力</option><option value="other">その他</option></select>
     <label class="lab" for="qUrl">ソースURL（任意）</label><input id="qUrl" type="url" placeholder="https://..." autocapitalize="none" autocorrect="off" spellcheck="false">
     <div class="note">タグと関連用語は、質問・回答から<b>自動で入ります</b>（外したいものは押して外す）。保存すると項目に「足されます」。消したいときは、項目の「編集」から。</div>
+  </div>
+</div>
+
+<!-- 書庫 -->
+<div class="sheet" id="shLib">
+  <div class="sh-head"><button id="libClose">閉じる</button><h2>🗄 書庫</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <div class="note" id="libStat"></div>
+    <div id="libRec"></div>
+    <input id="libQ" placeholder="棚（タグ）や項目をしぼる" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" style="margin-top:8px">
+    <div class="chips" id="libMode" style="margin-top:8px"><button class="fchip on" data-lm="sec">区画別</button><button class="fchip" data-lm="cnt">多い順</button><button class="fchip" data-lm="name">名前順</button><button class="fchip" data-lm="new">新しい順</button></div>
+    <div id="libBody"></div>
   </div>
 </div>
 
@@ -370,7 +388,7 @@ details.cat>summary::-webkit-details-marker{display:none}
 
 <script>
 'use strict';
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.8.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -1322,18 +1340,28 @@ function wire() {
   $('btnImportQR').addEventListener('click', () => $('fileQR').click());
   $('fileOwn').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importOwn(f); });
   $('fileQR').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importQuickRef(f); });
+  $('btnLib').addEventListener('click', openLib);
+  $('libClose').addEventListener('click', () => closeSheet('shLib'));
+  $('libQ').addEventListener('input', () => { libFilter = $('libQ').value; drawLib(); });
+  $('libMode').addEventListener('click', ev => { const b = ev.target.closest('[data-lm]'); if (!b) return; libMode = b.dataset.lm; document.querySelectorAll('#libMode .fchip').forEach(x => x.classList.toggle('on', x === b)); drawLib(); });
+  $('libBody').addEventListener('toggle', ev => { const d = ev.target; if (d && d.classList && d.classList.contains('shelf') && d.open) fillShelf(d); }, true);
+  $('shLib').addEventListener('click', async ev => {
+    const r = ev.target.closest('[data-lrec]'); if (r) { const x = libRecsCache[Number(r.dataset.lrec)]; if (x && confirm('「#' + x.from.label + '」を「#' + x.to.label + '」に統合します（' + x.from.ids.size + '項目が移ります）。よろしいですか？')) { const n = await retag(x.from.label, x.to.label); refresh(); drawLib(); toast(n + '項目を統合しました'); } return; }
+    const o = ev.target.closest('[data-open]'); if (o) { openEntry(o.dataset.open); return; }
+    const a = ev.target.closest('[data-ls]'); if (a) await libAct(a.dataset);
+  });
   $('btnSys').addEventListener('click', openSys);
   $('sysClose').addEventListener('click', () => closeSheet('shSys'));
   $('shSys').addEventListener('click', async ev => {
     const t = ev.target.closest('[data-sys],[data-syscat],[data-open]'); if (!t) return; const d = t.dataset;
     if (d.open) { openEntry(d.open); return; }
-    if (d.syscat) { rvCat = d.syscat; openBrain(); await reviewStart(); return; }
+    if (d.syscat) { rvCat = d.syscat; rvTag = ''; openBrain(); await reviewStart(); return; }
     if (d.sys === 'import') { await qrCloudImport(false); drawSysSteps(); drawSysTree(); }
     else if (d.sys === 'tidy') { if (entries.some(e => !(e.tags || []).length)) { await bulkAutoTag(); drawSysSteps(); } else openBrain(); }
     else if (d.sys === 'systemize') await systemizeRun();
     else if (d.sys === 'adopt') await sysAdopt();
     else if (d.sys === 'drop') { sysCand = null; drawSysCand(''); }
-    else if (d.sys === 'review') { rvCat = ''; openBrain(); await reviewStart(); }
+    else if (d.sys === 'review') { rvCat = ''; rvTag = ''; openBrain(); await reviewStart(); }
   });
   $('mgClose').addEventListener('click', () => closeSheet('shMerge'));
   $('mgQ').addEventListener('input', drawMerge);
@@ -1342,9 +1370,9 @@ function wire() {
     if (await confirmMerge(mergeFor, it.dataset.mg)) { closeSheet('shMerge'); openEntry(mergeFor); toast('統合しました'); }
   });
   $('btnBrain').addEventListener('click', openBrain);
-  $('brClose').addEventListener('click', () => { closeSheet('shBrain'); if ($('shSys').classList.contains('open')) { drawSysSteps(); drawSysTree(); } });
+  $('brClose').addEventListener('click', () => { closeSheet('shBrain'); if ($('shSys').classList.contains('open')) { drawSysSteps(); drawSysTree(); } if ($('shLib').classList.contains('open')) drawLib(); });
   $('btnBrainAsk').addEventListener('click', () => { void brainAsk(); });
-  $('btnReview').addEventListener('click', () => { rvCat = ''; void reviewStart(); });
+  $('btnReview').addEventListener('click', () => { rvCat = ''; rvTag = ''; void reviewStart(); });
   $('btnSaveOrg').addEventListener('click', () => { lsSet('kd_autoorg', $('sAutoOrg').checked ? '1' : '0'); toast($('sAutoOrg').checked ? '保存時のAI整理：オン' : '保存時のAI整理：オフ'); });
   $('shBrain').addEventListener('click', async e => {
     const t = e.target.closest('[data-open],[data-wl],[data-br],[data-rv],[data-rvund],[data-mgpair],#btnGrade'); if (!t) return;
@@ -1473,6 +1501,97 @@ function drawMerge() {
   $('mgList').innerHTML = (!q && sug.length ? '<div class="sec-h">似ている項目（上に出しています）</div>' : '') + list.map(o => '<div class="pick-item" data-mg="' + esc(o.id) + '"><b>' + esc(o.term) + '</b>' + (sug.includes(o) && !q ? ' <span class="kbadge">似ている</span>' : '') + (o.oneLine ? '<div class="note">' + esc(o.oneLine) + '</div>' : '') + '<div class="note">Q&amp;A ' + (qasByEntry.get(o.id) || []).length + '件</div></div>').join('') || '<div class="empty">相手になる項目がありません。</div>';
 }
 
+/* ───────── 書庫（タグで自動的に棚を作る。AIは使わない） ───────── */
+let libMode = 'sec', libFilter = '';
+function tagIndex() {
+  const m = new Map();
+  for (const e of entries) for (const t of e.tags || []) {
+    const n = norm(t); if (!n) continue;
+    const o = m.get(n) || { n, labels: new Map(), ids: new Set(), last: 0 };
+    o.labels.set(t, (o.labels.get(t) || 0) + 1); o.ids.add(e.id); o.last = Math.max(o.last, e.updatedAt || 0); m.set(n, o);
+  }
+  for (const o of m.values()) o.label = [...o.labels.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  return m;
+}
+const inter = (a, b) => { let c = 0; const [x, y] = a.size <= b.size ? [a, b] : [b, a]; x.forEach(v => { if (y.has(v)) c++; }); return c; };
+function libSections(m) {
+  const tags = [...m.values()].filter(o => o.ids.size >= 2).sort((a, b) => b.ids.size - a.ids.size), par = tags.map((_, i) => i);
+  const find = i => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+  for (let i = 0; i < tags.length; i++) for (let j = i + 1; j < tags.length; j++) {
+    const a = tags[i], b = tags[j], c = inter(a.ids, b.ids);
+    if (c >= 2 && c / Math.min(a.ids.size, b.ids.size) >= 0.8 && c / Math.max(a.ids.size, b.ids.size) >= 0.3) par[find(j)] = find(i);
+  }
+  const g = new Map(); tags.forEach((o, i) => { const r = find(i); if (!g.has(r)) g.set(r, []); g.get(r).push(o); });
+  const secs = [...g.values()].map(list => { const ids = new Set(); list.forEach(o => o.ids.forEach(x => ids.add(x))); return { name: list[0].label, shelves: list, ids }; }).sort((a, b) => b.ids.size - a.ids.size || a.name.localeCompare(b.name));
+  return { secs, singles: [...m.values()].filter(o => o.ids.size === 1).sort((a, b) => a.label.localeCompare(b.label)) };
+}
+function libRecs(m) {
+  const out = [], tags = [...m.values()].sort((a, b) => b.ids.size - a.ids.size).slice(0, 300);
+  for (let i = 0; i < tags.length && out.length < 6; i++) for (let j = i + 1; j < tags.length && out.length < 6; j++) {
+    const a = tags[i], b = tags[j], c = inter(a.ids, b.ids); let why = '';
+    if (c >= 2 && a.ids.size === b.ids.size && c === a.ids.size) why = '同じ項目に付いています';
+    else if (Math.min(a.n.length, b.n.length) >= 2 && (a.n.includes(b.n) || b.n.includes(a.n)) && (Math.abs(a.n.length - b.n.length) <= 3 || c / Math.min(a.ids.size, b.ids.size) >= 0.5)) why = '名前が似ています';
+    else { const x = bigramSet(a.n), y = bigramSet(b.n); let k = 0; x.forEach(v => { if (y.has(v)) k++; }); const u = x.size + y.size - k; if (a.n.length >= 3 && b.n.length >= 3 && u && k / u >= 0.7) why = '綴りが似ています'; }
+    if (why) out.push({ from: b, to: a, why });
+  }
+  return out;
+}
+function shelfHtml(o) {
+  const ids = [...o.ids].map(id => entryById.get(id)).filter(Boolean), kn = ids.filter(e => e.understanding === 'known').length, un = ids.filter(e => (e.understanding || 'unknown') === 'unknown').length;
+  return '<details class="shelf" data-shelf="' + esc(o.n) + '"><summary>#' + esc(o.label) + ' <span class="cnt">' + ids.length + '件' + (un ? '・未理解 ' + un : '') + '</span><div class="bar-bg"><div class="bar-fg" style="width:' + Math.round(kn / ids.length * 100) + '%"></div></div></summary><div class="shelf-in"></div></details>';
+}
+function fillShelf(det) {
+  const n = det.dataset.shelf, inn = det.querySelector('.shelf-in'); if (!inn || inn.dataset.done) return; inn.dataset.done = '1';
+  const label = (tagIndex().get(n) || {}).label || n;
+  const list = entries.filter(e => (e.tags || []).some(t => norm(t) === n)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  inn.innerHTML = '<div class="row" style="margin:4px 0 8px"><button class="btn sm" data-ls="list" data-t="' + esc(label) + '">一覧で見る</button><button class="btn sm" data-ls="rev" data-t="' + esc(n) + '">▶ この棚を復習</button></div><div class="row" style="margin-bottom:8px"><button class="btn sm" data-ls="ren" data-t="' + esc(label) + '">✏️ 名前を変える</button><button class="btn sm" data-ls="mer" data-t="' + esc(label) + '">🔀 別の棚に統合</button><button class="btn sm danger" data-ls="del" data-t="' + esc(label) + '">棚をなくす</button></div>' +
+    list.map(e => { const u = e.understanding || 'unknown'; return '<div class="card" data-open="' + esc(e.id) + '" style="margin:6px 0"><div class="c-top"><span class="c-term" style="font-size:16px">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge">' + KIND[e.kind] + '</span>' : '') + esc(e.term) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' + (e.oneLine ? '<div class="c-one">' + esc(e.oneLine) + '</div>' : '') + '</div>'; }).join('');
+}
+function drawLib() {
+  const m = tagIndex(), q = norm(libFilter), nTag = m.size, nUn = entries.filter(e => !(e.tags || []).length).length;
+  const { secs, singles } = libSections(m);
+  $('libStat').textContent = '棚 ' + nTag + '（' + secs.length + '区画＋ひとつだけの棚 ' + singles.length + '）　項目 ' + entries.length + '　タグなし ' + nUn;
+  const recs = libRecs(m);
+  let rh = '';
+  if (recs.length) rh += '<div class="sec-h" style="margin-top:6px">整理のおすすめ（AIなし・端末の中で判定）</div>' + recs.map((r, i) => '<div class="rec"><span>#' + esc(r.from.label) + ' → #' + esc(r.to.label) + '　<span class="note">' + r.why + '</span></span><button class="btn sm" data-lrec="' + i + '">統合</button></div>').join('');
+  if (nUn) rh += '<div class="rec"><span>タグのない項目が ' + nUn + '件あります（棚に入っていません）</span><button class="btn sm" data-ls="autotag">🏷 自動でタグを付ける</button></div>';
+  $('libRec').innerHTML = rh; libRecsCache = recs;
+  const match = o => !q || o.n.includes(q) || [...o.ids].some(id => { const e = entryById.get(id); return e && norm(e.term).includes(q); });
+  let h = '';
+  if (libMode === 'sec') {
+    secs.forEach((sc, i) => { const sh = sc.shelves.filter(match); if (!sh.length) return; h += '<details class="cat"' + (i < 3 || q ? ' open' : '') + '><summary>' + esc(sc.name) + ' の区画 <span class="note" style="font-weight:400">棚 ' + sh.length + '・項目 ' + sc.ids.size + '</span></summary><div style="padding-bottom:8px">' + sh.map(shelfHtml).join('') + '</div></details>'; });
+    const sg = singles.filter(match); if (sg.length) h += '<details class="cat"' + (q ? ' open' : '') + '><summary>ひとつだけの棚 <span class="note" style="font-weight:400">' + sg.length + '</span></summary><div style="padding-bottom:8px">' + sg.map(shelfHtml).join('') + '</div></details>';
+  } else {
+    const all = [...m.values()].filter(match);
+    all.sort(libMode === 'cnt' ? (a, b) => b.ids.size - a.ids.size || a.label.localeCompare(b.label) : libMode === 'new' ? (a, b) => b.last - a.last : (a, b) => a.label.localeCompare(b.label));
+    h += all.map(shelfHtml).join('');
+  }
+  if (!q) { const un = entries.filter(e => !(e.tags || []).length); if (un.length) h += '<details class="cat"><summary>タグなし <span class="note" style="font-weight:400">' + un.length + '件</span></summary><div style="padding-bottom:10px">' + un.slice(0, 80).map(e => '<button class="tagbtn" data-open="' + esc(e.id) + '">' + esc(e.term) + '</button>').join('') + '</div></details>'; }
+  $('libBody').innerHTML = h || '<div class="empty">棚がまだありません。Q&amp;Aを足すと、タグから自動で棚ができます。</div>';
+}
+let libRecsCache = [];
+function openLib() { drawLib(); openSheet('shLib'); }
+async function retag(from, to) {
+  const f = norm(from), t = String(to || '').trim().replace(/[\s,、，#＃]+/g, '-').slice(0, 30); if (!f) return 0;
+  const now = Date.now(), out = [];
+  for (const e of entries) {
+    if (!(e.tags || []).some(x => norm(x) === f)) continue;
+    const rest = (e.tags || []).filter(x => norm(x) !== f);
+    out.push(Object.assign({}, e, { tags: t ? union(rest, [t]) : rest, updatedAt: now }));
+  }
+  if (out.length) await writeEntries(out);
+  return out.length;
+}
+async function libAct(d) {
+  const t = d.t;
+  if (d.ls === 'list') { closeSheet('shLib'); $('q').value = t; searchQuery = t; filterUnd = 'all'; filterKind = 'all'; document.querySelectorAll('#fchips .fchip').forEach(x => x.classList.toggle('on', x.dataset.f === 'all')); document.querySelectorAll('#kchips .fchip').forEach(x => x.classList.toggle('on', x.dataset.k === 'all')); renderList(); window.scrollTo(0, 0); return; }
+  if (d.ls === 'rev') { rvTag = t; rvCat = ''; openBrain(); await reviewStart(); return; }
+  if (d.ls === 'autotag') { await bulkAutoTag(); drawLib(); return; }
+  if (d.ls === 'ren') { const nn = prompt('「#' + t + '」の新しい名前（すでにある棚の名前にすると、統合されます）', t); if (nn == null || !nn.trim() || norm(nn) === norm(t)) return; const n = await retag(t, nn); refresh(); drawLib(); toast(n + '項目のタグを変えました'); return; }
+  if (d.ls === 'mer') { const nn = prompt('「#' + t + '」を、どの棚に統合しますか？（棚の名前を入力）', ''); if (nn == null || !nn.trim() || norm(nn) === norm(t)) return; if (!confirm('「#' + t + '」の項目を「#' + nn.trim() + '」に移します。よろしいですか？')) return; const n = await retag(t, nn); refresh(); drawLib(); toast(n + '項目を移しました'); return; }
+  if (d.ls === 'del') { if (!confirm('「#' + t + '」の棚をなくします（項目は消えません。この項目からタグが外れます）。よろしいですか？')) return; const n = await retag(t, ''); refresh(); drawLib(); toast(n + '項目からタグを外しました'); }
+}
+
 /* ───────── 体系・学習（分野・前提・レベルで知識を体系にし、復習を回す） ───────── */
 const LVL = { 1: '基礎', 2: '応用', 3: '発展' };
 const catOf = e => String(e.cat || '').trim();
@@ -1481,9 +1600,9 @@ const inCat = (e, c) => !c || catOf(e) === c || catOf(e).startsWith(c + '/');
 const hasContent = e => !!(e.note || (qasByEntry.get(e.id) || []).length);
 const prereqOk = e => (e.prereq || []).every(t => { const p = findEntryByTerm(t); return !p || p.understanding === 'known'; });
 function isDue(e, now) { return e.nextAt ? e.nextAt <= now : (e.understanding || 'unknown') !== 'known'; }
-function dueList(cat) {
+function dueList(cat, tag) {
   const now = Date.now(), rk = { unknown: 0, learning: 1, known: 2 };
-  return entries.filter(e => hasContent(e) && inCat(e, cat) && isDue(e, now))
+  return entries.filter(e => hasContent(e) && inCat(e, cat) && (!tag || (e.tags || []).some(t => norm(t) === tag)) && isDue(e, now))
     .sort((a, b) => (prereqOk(b) - prereqOk(a)) || ((a.lvl || 2) - (b.lvl || 2)) || (rk[a.understanding || 'unknown'] - rk[b.understanding || 'unknown']) || ((a.checkedAt || 0) - (b.checkedAt || 0)));
 }
 // 学習ログ（端末の中だけ）
@@ -1665,14 +1784,14 @@ async function brainSave() {
 }
 
 /* 復習 */
-let rv = null, rvCat = '';
+let rv = null, rvCat = '', rvTag = '';
 function pickReview() {
-  const cand = dueList(rvCat); if (!cand.length) return null;
+  const cand = dueList(rvCat, rvTag); if (!cand.length) return null;
   const skip = rv ? rv.skip : new Set(); return cand.find(e => !skip.has(e.id)) || cand[0];
 }
 async function reviewStart() {
   if (brainBusy) return;
-  const e = pickReview(); if (!e) { $('rvBox').innerHTML = '<div class="note">' + (rvCat ? '「' + esc(rvCat) + '」で' : '') + '今日復習する項目はありません（中身のある項目が、復習の時期になると出ます）。</div>'; return; }
+  const e = pickReview(); if (!e) { $('rvBox').innerHTML = '<div class="note">' + (rvCat ? '「' + esc(rvCat) + '」で' : '') + (rvTag ? '「#' + esc(rvTag) + '」の棚で' : '') + '今日復習する項目はありません（中身のある項目が、復習の時期になると出ます）。</div>'; return; }
   const skip = rv ? rv.skip : new Set(); skip.add(e.id);
   brainBusy = true; $('btnReview').disabled = true; $('rvBox').innerHTML = '<div class="note">問題を作っています…</div>';
   let q = '', err = '';
