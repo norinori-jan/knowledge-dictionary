@@ -129,6 +129,17 @@ details.cat>summary::-webkit-details-marker{display:none}
 .shelf>summary::-webkit-details-marker{display:none}
 .shelf .cnt{font-weight:400;color:var(--sub);font-size:13px}
 .rec{background:var(--warn);border:1px solid var(--warn-line);border-radius:12px;padding:8px 12px;margin:6px 0;font-size:14px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.c-q{font-size:13px;color:var(--sub);margin-top:5px}
+.c-concl{font-size:15px;font-weight:700;margin-top:3px;line-height:1.5}
+.src{font-size:11px;font-weight:400;color:var(--sub);margin-left:4px}
+.crow{padding:10px 12px}
+.crow .ct{font-weight:800;font-size:15px}
+.crow .cc{font-size:14px;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dg{border-color:var(--accent)!important}
+ol.tl{margin:4px 0 0;padding-left:20px;font-size:14px;line-height:1.6}
+ol.tl li{margin:3px 0}
+ol.tl .d{color:var(--sub);font-size:12px}
+ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
 </style>
 </head>
 <body>
@@ -153,6 +164,7 @@ details.cat>summary::-webkit-details-marker{display:none}
       <button class="fchip" data-f="learning">理解中</button>
       <button class="fchip" data-f="known">理解済</button>
     </div>
+    <div class="chips" id="vchips"><button class="fchip on" data-v="card">カード</button><button class="fchip" data-v="concl">結論一覧</button></div>
     <div class="chips" id="kchips">
       <button class="fchip on" data-k="all">全種類</button>
       <button class="fchip" data-k="term">用語</button>
@@ -186,6 +198,7 @@ details.cat>summary::-webkit-details-marker{display:none}
     <label class="lab" for="eePre">前提にする項目（先に分かっているべき語。カンマで区切る）</label><input id="eePre" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="lab" for="eeAlias">別名（統合した語など。カンマで区切る。[[別名]]のリンクもこの項目に届きます）</label><input id="eeAlias" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="lab" for="eeRel">関連用語（カンマか空白で区切る）</label><input id="eeRel" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="lab" for="eeConcl">結論（自分の言葉で。空なら、自分の判断・AIのまとめ・回答から自動で出します）</label><textarea id="eeConcl" rows="2" maxlength="300"></textarea>
     <label class="lab" for="eeNote" style="display:flex;justify-content:space-between;align-items:center">自分の理解（自分の言葉で。手順は「1. 2. 3.」の行で） <button class="btn sm" type="button" data-linkpick="eeNote">🔗 リンク</button></label><textarea id="eeNote" rows="6" placeholder="例：1. [[JWT]] を発行する&#10;2. [[Cookie]] に入れる"></textarea>
     <div class="note">[[見出し語]] と書くと、その項目へのリンクになります（Obsidianと同じ書き方）。</div>
     <div class="box" style="margin-top:18px"><button class="btn danger wide" id="eeDelete">この項目を削除（Q&amp;Aも消えます）</button></div>
@@ -388,7 +401,7 @@ details.cat>summary::-webkit-details-marker{display:none}
 
 <script>
 'use strict';
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.9.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -520,7 +533,7 @@ function idxOf(e) {
   let x = idxCache.get(e.id); if (x) return x;
   const qs = qasByEntry.get(e.id) || [];
   const qa = qs.map(q => norm([q.question, q.answer, q.judgment].join(' ')));
-  x = { alias: (e.aliases || []).map(norm), term: norm(e.term), one: norm(e.oneLine), tags: (e.tags || []).map(norm), rel: (e.related || []).map(norm), note: norm(e.note), qa, qaQ: qs.map(q => norm(q.question)), all: '', bi: null };
+  x = { alias: (e.aliases || []).map(norm), term: norm(e.term), one: norm(e.oneLine), tags: (e.tags || []).map(norm), rel: (e.related || []).map(norm), note: norm((e.note || '') + ' ' + (e.conclusion || '') + ' ' + (e.digest ? (e.digest.concl || '') + ' ' + (e.digest.q || '') : '')), qa, qaQ: qs.map(q => norm(q.question)), all: '', bi: null };
   x.all = [x.term, x.one, x.tags.join(' '), x.rel.join(' '), x.note, qa.join(' ')].join(' ');
   idxCache.set(e.id, x); return x;
 }
@@ -580,6 +593,7 @@ function snippetFor(e, toks) {
 }
 
 /* ───────── 一覧 ───────── */
+let listView = lsGet('kd_view') === 'concl' ? 'concl' : 'card';
 function renderList() {
   const toks = tokensOf(searchQuery);
   const list = searchEntries(searchQuery, filterUnd, filterKind);
@@ -591,12 +605,21 @@ function renderList() {
     return;
   }
   if (!list.length) { box.innerHTML = '<div class="empty">見つかりませんでした。<br><span style="font-size:13px">語を減らすか、別の言い方で試してください。</span></div>'; return; }
+  if (listView === 'concl') {
+    box.innerHTML = list.map(e => {
+      const u = e.understanding || 'unknown', c = conclusionOf(e);
+      return '<div class="card crow" data-open="' + esc(e.id) + '"><div class="c-top"><span class="ct">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge">' + KIND[e.kind] + '</span>' : '') + hl(e.term, toks) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div><div class="cc">' + (c ? '🎯 ' + hl(c.text, toks) : '<span class="note">（結論なし）</span>') + '</div></div>';
+    }).join('');
+    return;
+  }
   box.innerHTML = list.map(e => {
     const n = (qasByEntry.get(e.id) || []).length, u = e.understanding || 'unknown';
     const tags = (e.tags || []).map(t => '<span class="tag lk" data-tagq="' + esc(t) + '">#' + hl(t, toks) + '</span>').join('');
-    const sn = snippetFor(e, toks);
+    const sn = snippetFor(e, toks), cl = conclLine(e), qq = questionOf(e);
+    const showSn = sn && (!cl || (toks.length && sn.startsWith('💬')));
     return '<div class="card" data-open="' + esc(e.id) + '"><div class="c-top"><span class="c-term">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge">' + KIND[e.kind] + '</span>' : '') + hl(e.term, toks) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' +
-      (sn ? '<div class="c-one">' + hl(sn, toks) + '</div>' : '') + (tags ? '<div class="c-tags">' + tags + '</div>' : '') +
+      (qq && cl ? '<div class="c-q">❓ ' + hl(qq, toks) + '</div>' : '') + cl +
+      (showSn ? '<div class="c-one">' + hl(sn, toks) + '</div>' : '') + (tags ? '<div class="c-tags">' + tags + '</div>' : '') +
       '<div class="c-meta">Q&amp;A ' + n + '件 · ' + dstr(e.updatedAt) + '</div></div>';
   }).join('');
 }
@@ -638,6 +661,7 @@ function openEntry(id) {
   if (e.oneLine) h += '<div style="font-size:17px;margin-top:4px">' + rich(e.oneLine) + '</div>';
   h += '<div class="und-row">' + ['unknown', 'learning', 'known'].map(k => '<button class="und-' + k + (u === k ? ' on' : '') + '" data-und="' + k + '">' + UND[k] + '</button>').join('') + '</div>';
   if (e.checkedAt) h += '<div class="note" style="margin-top:-4px">理解度を確認した日：' + dstr(e.checkedAt) + '</div>';
+  h += digestHtml(e);
   if ((e.tags || []).length) h += '<div style="margin:8px 0">' + e.tags.map(t => '<button class="tagbtn" data-search="' + esc(t) + '">#' + esc(t) + '</button>').join('') + '</div>';
   if ((e.related || []).length) h += '<div class="sec-h">関連用語</div><div>' + e.related.map(t => '<button class="tagbtn' + (findEntryByTerm(t) ? ' has' : '') + '" data-rel="' + esc(t) + '">' + (findEntryByTerm(t) ? '📖 ' : '') + esc(t) + '</button>').join('') + '</div><div class="note">📖 付きは、辞書に項目があります。</div>';
   if (e.note) h += '<div class="box" style="border-color:var(--accent)"><div class="lab">自分の理解</div><div>' + rich(e.note) + '</div></div>';
@@ -678,7 +702,7 @@ async function setUnderstanding(k) {
 function openEntryEdit() {
   const e = entryById.get(viewId); if (!e) return;
   $('eeTerm').value = e.term; $('eeOne').value = e.oneLine || ''; $('eeTags').value = (e.tags || []).join(' ');
-  $('eeCat').value = e.cat || ''; $('eeLvl').value = e.lvl ? String(e.lvl) : ''; $('eePre').value = (e.prereq || []).join('、'); $('eeAlias').value = (e.aliases || []).join('、'); $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || ''; $('eeKind').value = e.kind || 'term';
+  $('eeConcl').value = e.conclusion || ''; $('eeCat').value = e.cat || ''; $('eeLvl').value = e.lvl ? String(e.lvl) : ''; $('eePre').value = (e.prereq || []).join('、'); $('eeAlias').value = (e.aliases || []).join('、'); $('eeRel').value = (e.related || []).join(' '); $('eeNote').value = e.note || ''; $('eeKind').value = e.kind || 'term';
   openSheet('shEntryEdit');
 }
 async function saveEntryEdit() {
@@ -686,7 +710,7 @@ async function saveEntryEdit() {
   const term = $('eeTerm').value.trim(); if (!term) { toast('見出し語を入れてください'); return; }
   const other = findEntryByTerm(term);
   if (other && other.id !== e.id) { toast('同じ見出し語の項目があります。名前を変えてください'); return; }
-  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), aliases: splitAlias($('eeAlias').value), cat: cleanCat($('eeCat').value), lvl: Number($('eeLvl').value) || 0, prereq: splitAlias($('eePre').value).filter(t => norm(t) !== norm(term)), note: $('eeNote').value.trim(), kind: $('eeKind').value, updatedAt: Date.now() })]);
+  await writeEntries([Object.assign({}, e, { term, oneLine: $('eeOne').value.trim(), tags: splitList($('eeTags').value), related: splitList($('eeRel').value), aliases: splitAlias($('eeAlias').value), conclusion: $('eeConcl').value.trim().slice(0, 300), cat: cleanCat($('eeCat').value), lvl: Number($('eeLvl').value) || 0, prereq: splitAlias($('eePre').value).filter(t => norm(t) !== norm(term)), note: $('eeNote').value.trim(), kind: $('eeKind').value, updatedAt: Date.now() })]);
   closeSheet('shEntryEdit'); openEntry(viewId); refresh(); toast('保存しました');
 }
 async function deleteEntry() {
@@ -1263,6 +1287,8 @@ function wire() {
   $('q').addEventListener('input', e => { searchQuery = e.target.value; renderList(); });
   $('btnClear').addEventListener('click', () => { $('q').value = ''; searchQuery = ''; renderList(); $('q').focus(); });
   $('fchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filterUnd = b.dataset.f; document.querySelectorAll('#fchips .fchip').forEach(x => x.classList.toggle('on', x === b)); renderList(); });
+  document.querySelectorAll('#vchips .fchip').forEach(x => x.classList.toggle('on', x.dataset.v === listView));
+  $('vchips').addEventListener('click', ev => { const b = ev.target.closest('[data-v]'); if (!b) return; listView = b.dataset.v; lsSet('kd_view', listView); document.querySelectorAll('#vchips .fchip').forEach(x => x.classList.toggle('on', x === b)); renderList(); });
   $('btnAdd').addEventListener('click', () => openQAForm());
   $('btnSettings').addEventListener('click', () => { renderSettings(); openSheet('shSet'); });
   document.body.addEventListener('click', e => {
@@ -1297,7 +1323,7 @@ function wire() {
   $('enClose').addEventListener('click', () => { closeSheet('shEntry'); viewId = null; });
   $('enEdit').addEventListener('click', openEntryEdit);
   $('enBody').addEventListener('click', async e => {
-    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open],[data-wl],[data-graph],[data-aiconn],[data-cn],[data-merge]'); if (!t) return;
+    const t = e.target.closest('[data-und],[data-search],[data-rel],[data-copy],[data-qaedit],[data-qadel],[data-addto],[data-open],[data-wl],[data-graph],[data-aiconn],[data-cn],[data-merge],[data-dg]'); if (!t) return;
     const d = t.dataset;
     if (d.und) await setUnderstanding(d.und);
     else if (d.search) { closeSheet('shEntry'); viewId = null; $('q').value = d.search; searchQuery = d.search; filterUnd = 'all'; document.querySelectorAll('#fchips .fchip').forEach(x => x.classList.toggle('on', x.dataset.f === 'all')); renderList(); }
@@ -1308,6 +1334,11 @@ function wire() {
     else if (d.addto) { const en = entryById.get(d.addto); if (en) openQAForm({ term: en.term }); }
     else if (d.wl) await openOrCreateTerm(d.wl);
     else if (d.graph) openGraph(d.graph);
+    else if (d.dg) {
+      if (d.dg === 'ai') await digestOne(d.id);
+      else if (d.dg === 'self') { openEntryEdit(); setTimeout(() => { try { $('eeConcl').focus(); } catch (_) {} }, 350); }
+      else if (d.dg === 'tonote') { const en = entryById.get(d.id); if (en && en.digest && en.digest.plain) { if (en.note && !confirm('自分の理解の末尾に、この説明を足します。よろしいですか？')) return; await writeEntries([Object.assign({}, en, { note: en.note ? en.note + '\n\n' + en.digest.plain : en.digest.plain, updatedAt: Date.now() })]); openEntry(d.id); refresh(); toast('自分の理解に入れました。自分の言葉に直すと、さらに身につきます'); } }
+    }
     else if (d.merge) openMerge(d.merge);
     else if (d.aiconn) await aiConnect(d.aiconn);
     else if (d.cn) await connAdopt(t);
@@ -1358,6 +1389,7 @@ function wire() {
     if (d.syscat) { rvCat = d.syscat; rvTag = ''; openBrain(); await reviewStart(); return; }
     if (d.sys === 'import') { await qrCloudImport(false); drawSysSteps(); drawSysTree(); }
     else if (d.sys === 'tidy') { if (entries.some(e => !(e.tags || []).length)) { await bulkAutoTag(); drawSysSteps(); } else openBrain(); }
+    else if (d.sys === 'digest') await digestBatch();
     else if (d.sys === 'systemize') await systemizeRun();
     else if (d.sys === 'adopt') await sysAdopt();
     else if (d.sys === 'drop') { sysCand = null; drawSysCand(''); }
@@ -1462,7 +1494,7 @@ async function mergeEntries(keepId, dropId) {
     oneLine: k.oneLine || d.oneLine || '', tags: union(k.tags, d.tags), note,
     related: union(k.related, d.related).filter(t => norm(t) !== norm(k.term) && norm(t) !== norm(d.term)),
     aliases: union(union(k.aliases, [d.term]), d.aliases).filter(a => norm(a) !== norm(k.term)),
-    cat: k.cat || d.cat || '', lvl: k.lvl || d.lvl || 0, prereq: union(k.prereq, d.prereq).filter(t => norm(t) !== norm(k.term) && norm(t) !== norm(d.term)),
+    conclusion: k.conclusion || d.conclusion || '', cat: k.cat || d.cat || '', lvl: k.lvl || d.lvl || 0, prereq: union(k.prereq, d.prereq).filter(t => norm(t) !== norm(k.term) && norm(t) !== norm(d.term)),
     understanding: rank[ku] <= rank[du] ? ku : du,
     kind: (k.kind && k.kind !== 'term') ? k.kind : (d.kind || k.kind || 'term'), updatedAt: now
   });
@@ -1499,6 +1531,94 @@ function drawMerge() {
   const sug = dupPairs().filter(x => x.a.id === e.id || x.b.id === e.id).map(x => x.a.id === e.id ? x.b : x.a);
   const list = (tokensOf(q).length ? searchEntries(q, 'all', 'all') : sug.concat(entries.filter(o => !sug.includes(o)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)))).filter(o => o.id !== e.id).slice(0, 40);
   $('mgList').innerHTML = (!q && sug.length ? '<div class="sec-h">似ている項目（上に出しています）</div>' : '') + list.map(o => '<div class="pick-item" data-mg="' + esc(o.id) + '"><b>' + esc(o.term) + '</b>' + (sug.includes(o) && !q ? ' <span class="kbadge">似ている</span>' : '') + (o.oneLine ? '<div class="note">' + esc(o.oneLine) + '</div>' : '') + '<div class="note">Q&amp;A ' + (qasByEntry.get(o.id) || []).length + '件</div></div>').join('') || '<div class="empty">相手になる項目がありません。</div>';
+}
+
+/* ───────── 結論・経過・理解（一覧で「何を調べて、どうなったか」が分かるように） ───────── */
+const stripMd = t => String(t || '').replace(/```[\s\S]*?```/g, ' ').replace(/`([^`]*)`/g, '$1').replace(/\*\*([^*]*)\*\*/g, '$1').replace(/^#{1,6}\s*/gm, '').replace(/^>\s?/gm, '').replace(/^\s*[-*]\s+/gm, '').replace(/^\s*\d+\.\s+/gm, '').replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (m, a, b) => b || a);
+function gist(text, n) {
+  const t = stripMd(text).replace(/([。！？!?])/g, '$1\n'), sents = t.split('\n').map(x => x.replace(/\s+/g, ' ').trim()).filter(x => x.length >= 6);
+  const key = sents.find(x => /結論|つまり|要するに|まとめると|まとめ|ポイントは|おすすめ|重要/.test(x));
+  return (key || sents[0] || t.replace(/\s+/g, ' ').trim()).slice(0, n || 90);
+}
+const qaAsc = e => (qasByEntry.get(e.id) || []).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+function digestFresh(e) { const d = e.digest; if (!d) return false; const q = qasByEntry.get(e.id) || []; return d.n === q.length && d.up === q.reduce((m, x) => Math.max(m, x.updatedAt || 0), 0); }
+function conclusionOf(e) {
+  if (e.conclusion && e.conclusion.trim()) return { text: e.conclusion.trim(), src: '自分の結論' };
+  const d = e.digest && e.digest.concl ? String(e.digest.concl) : '', fresh = digestFresh(e);
+  if (d && fresh) return { text: d, src: 'AIのまとめ' };
+  const q = qaAsc(e), j = q.slice().reverse().find(x => x.judgment && x.judgment.trim());
+  if (j) return { text: stripMd(j.judgment).replace(/\s+/g, ' ').trim().slice(0, 110), src: '自分の判断' };
+  if (d) return { text: d, src: 'AIのまとめ（古い）' };
+  const last = q[q.length - 1];
+  if (last && last.answer) return { text: gist(last.answer, 100), src: '自動抜粋' };
+  if (e.oneLine) return { text: e.oneLine, src: '一言' };
+  return null;
+}
+function questionOf(e) {
+  if (e.digest && e.digest.q && digestFresh(e)) return String(e.digest.q);
+  const q = qaAsc(e)[0]; return q ? stripMd(firstLine(q.question)).slice(0, 60) : '';
+}
+function timelineOf(e) {
+  if (e.digest && Array.isArray(e.digest.steps) && e.digest.steps.length && digestFresh(e)) return { ai: true, rows: e.digest.steps.map(x => ({ t: String(x) })) };
+  return { ai: false, rows: qaAsc(e).map(q => ({ d: dstr(q.createdAt), q: stripMd(firstLine(q.question)).slice(0, 40), g: q.judgment && q.judgment.trim() ? '判断：' + stripMd(q.judgment).replace(/\s+/g, ' ').slice(0, 50) : gist(q.answer, 60) })) };
+}
+function conclLine(e) { const c = conclusionOf(e); return c ? '<div class="c-concl">🎯 ' + esc(c.text) + '<span class="src">' + esc(c.src) + '</span></div>' : ''; }
+function digestHtml(e) {
+  const c = conclusionOf(e), q = questionOf(e), tl = timelineOf(e), dg = e.digest, fresh = digestFresh(e);
+  let h = '<div class="box dg"><div class="lab">❓ 何を調べていたか</div><div>' + (q ? esc(q) : '<span class="note">まだ質問がありません</span>') + '</div>';
+  h += '<div class="lab">🎯 結論<span class="src">' + esc(c ? c.src : '') + '</span></div><div style="font-weight:700;font-size:17px;line-height:1.55">' + (c ? rich(c.text) : '<span class="note" style="font-weight:400">まだ結論がありません。「AIでまとめる」か「結論を自分で書く」で入れられます。</span>') + '</div>';
+  if (tl.rows.length) h += '<div class="lab">🧭 経過' + (tl.ai ? '<span class="src">AIの整理</span>' : '<span class="src">Q&amp;Aの順（自動）</span>') + '</div><ol class="tl">' + tl.rows.map(r => tl.ai ? '<li>' + esc(r.t) + '</li>' : '<li><span class="d">' + esc(r.d) + '</span> ' + esc(r.q) + (r.g ? ' → ' + esc(r.g) : '') + '</li>').join('') + '</ol>';
+  if (dg && Array.isArray(dg.open) && dg.open.length) h += '<div class="lab">❔ まだ分からないこと' + (fresh ? '' : '<span class="src">古い</span>') + '</div><ul class="op">' + dg.open.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+  if (dg && dg.plain) h += '<div class="lab">💡 やさしく言うと' + (fresh ? '' : '<span class="src">古い</span>') + '</div><div>' + rich(dg.plain) + '</div><button class="btn sm" data-dg="tonote" data-id="' + esc(e.id) + '" style="margin-top:6px">📥 自分の理解に入れる</button>';
+  if (dg && !fresh) h += '<div class="note" style="margin-top:6px">Q&amp;Aが増えたので、AIのまとめは古くなっています。</div>';
+  h += '<div class="row" style="margin-top:10px"><button class="btn sm" data-dg="ai" data-id="' + esc(e.id) + '">📝 AIでまとめる（トークンを使います）</button><button class="btn sm" data-dg="self" data-id="' + esc(e.id) + '">✏️ 結論を自分で書く</button></div></div>';
+  return h;
+}
+function digestMaterial(e, budget) {
+  const qs = qaAsc(e).slice(-5);
+  let t = '■' + e.term + (e.oneLine ? '（' + e.oneLine + '）' : '') + (e.note ? '\n自分の理解：' + e.note.slice(0, 400) : '');
+  qs.forEach(q => { t += '\n[' + dstr(q.createdAt) + '] Q：' + q.question.slice(0, 140) + '\nA：' + q.answer.slice(0, 380) + (q.judgment ? '\n自分の判断：' + q.judgment.slice(0, 220) : ''); });
+  return t.slice(0, budget || 2200);
+}
+function digestPrompt(list) {
+  return redact('次の辞書項目それぞれについて、これまで調べてきた内容を整理してください。\nJSONだけを返してください: {"items":[{"term":"見出し語（そのまま）","question":"何を調べていたか（40字以内）","conclusion":"結論（100字以内）","steps":["経過（調べた順に、1つ30字以内）"],"open":["まだ分からないこと"],"plain":"やさしい説明（150字以内。専門語を使わず、たとえ話もOK）"}]}\nルール:\n- 材料に書かれていることだけで作る。書かれていないことは足さない\n- 「自分の判断」があれば、それを結論の中心にする\n- 結論がまだ出ていないときは、conclusion を「まだ結論なし：分かっていること…」にする\n- steps は最大5個、open は最大3個（なければ空）\n\n' + list.map(x => digestMaterial(x)).join('\n\n---\n\n')).text;
+}
+function applyDigest(e, it) {
+  const q = qasByEntry.get(e.id) || [], str = (v, n) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, n), arr = (v, n, m) => (Array.isArray(v) ? v : []).map(x => str(x, n)).filter(Boolean).slice(0, m);
+  const dg = { q: str(it.question, 60), concl: str(it.conclusion, 150), steps: arr(it.steps, 50, 5), open: arr(it.open, 50, 3), plain: str(it.plain, 260), at: Date.now(), n: q.length, up: q.reduce((m, x) => Math.max(m, x.updatedAt || 0), 0) };
+  if (!dg.concl && !dg.q) return null;
+  return Object.assign({}, e, { digest: dg, updatedAt: Date.now() });
+}
+function parseDigestItems(raw) { const a = raw.indexOf('{'), b = raw.lastIndexOf('}'); const o = JSON.parse(raw.slice(a, b + 1)); return Array.isArray(o.items) ? o.items : []; }
+let digestBusy = false;
+async function digestOne(id) {
+  const e = entryById.get(id); if (!e || digestBusy) return;
+  if (!(qasByEntry.get(id) || []).length && !e.note) { toast('Q&Aか自分の理解がないと、まとめられません'); return; }
+  digestBusy = true; toast('AIがまとめています…（最大90秒）');
+  try {
+    const items = parseDigestItems(await callAI(digestPrompt([e]), { maxTokens: 1500 }));
+    const it = items.find(x => findEntryByTerm(String(x && x.term || '')) === e) || items[0];
+    const ne = it && applyDigest(e, it); if (!ne) throw new Error('AIの返事を読み取れませんでした');
+    await writeEntries([ne]); refresh(); if ($('shEntry').classList.contains('open') && viewId === id) openEntry(id); toast('まとめました');
+  } catch (x) { toast('まとめられませんでした：' + String((x && x.message) || x).slice(0, 80)); }
+  digestBusy = false;
+}
+const digestTargets = () => entries.filter(e => (qasByEntry.get(e.id) || []).length && !digestFresh(e) && !(e.conclusion && e.conclusion.trim()));
+async function digestBatch() {
+  if (digestBusy) return; const T = digestTargets(); if (!T.length) { toast('まとめる項目はありません'); return; }
+  const B = 3, nb = Math.ceil(T.length / B);
+  if (!confirm('結論・経過・やさしい説明がまだ（または古い）' + T.length + '項目を、' + nb + '回に分けてAIに送ってまとめます（API ' + nb + '回分）。自分の結論や入力済みの内容は変えません。よろしいですか？')) return;
+  digestBusy = true; let done = 0, bad = 0;
+  for (let i = 0; i < nb; i++) {
+    $('sysCand').innerHTML = '<div class="note">AIがまとめています… ' + (i + 1) + '/' + nb + '</div>';
+    const part = T.slice(i * B, (i + 1) * B);
+    try {
+      const items = parseDigestItems(await callAI(digestPrompt(part), { maxTokens: 3000 })), out = [];
+      for (const it of items) { const e = findEntryByTerm(String(it && it.term || '')); if (!e || !part.includes(e)) continue; const ne = applyDigest(e, it); if (ne) out.push(ne); }
+      if (out.length) { await writeEntries(out); done += out.length; } else bad++;
+    } catch (x) { bad++; if (x && /上限|未設定|トークンが違います/.test(x.message || '')) break; }
+  }
+  digestBusy = false; $('sysCand').innerHTML = ''; refresh(); drawSysSteps(); drawSysTree(); toast(done + '項目をまとめました' + (bad ? '（' + bad + '回は失敗）' : ''));
 }
 
 /* ───────── 書庫（タグで自動的に棚を作る。AIは使わない） ───────── */
@@ -1545,7 +1665,7 @@ function fillShelf(det) {
   const label = (tagIndex().get(n) || {}).label || n;
   const list = entries.filter(e => (e.tags || []).some(t => norm(t) === n)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   inn.innerHTML = '<div class="row" style="margin:4px 0 8px"><button class="btn sm" data-ls="list" data-t="' + esc(label) + '">一覧で見る</button><button class="btn sm" data-ls="rev" data-t="' + esc(n) + '">▶ この棚を復習</button></div><div class="row" style="margin-bottom:8px"><button class="btn sm" data-ls="ren" data-t="' + esc(label) + '">✏️ 名前を変える</button><button class="btn sm" data-ls="mer" data-t="' + esc(label) + '">🔀 別の棚に統合</button><button class="btn sm danger" data-ls="del" data-t="' + esc(label) + '">棚をなくす</button></div>' +
-    list.map(e => { const u = e.understanding || 'unknown'; return '<div class="card" data-open="' + esc(e.id) + '" style="margin:6px 0"><div class="c-top"><span class="c-term" style="font-size:16px">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge">' + KIND[e.kind] + '</span>' : '') + esc(e.term) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' + (e.oneLine ? '<div class="c-one">' + esc(e.oneLine) + '</div>' : '') + '</div>'; }).join('');
+    list.map(e => { const u = e.understanding || 'unknown'; return '<div class="card" data-open="' + esc(e.id) + '" style="margin:6px 0"><div class="c-top"><span class="c-term" style="font-size:16px">' + (e.kind && e.kind !== 'term' ? '<span class="kbadge">' + KIND[e.kind] + '</span>' : '') + esc(e.term) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' + (conclLine(e) || (e.oneLine ? '<div class="c-one">' + esc(e.oneLine) + '</div>' : '')) + '</div>'; }).join('');
 }
 function drawLib() {
   const m = tagIndex(), q = norm(libFilter), nTag = m.size, nUn = entries.filter(e => !(e.tags || []).length).length;
@@ -1618,11 +1738,13 @@ function studyLine() {
 }
 function drawSysSteps() {
   const un = entries.filter(e => !catOf(e)).length, notag = entries.filter(e => !(e.tags || []).length).length, dup = entries.length > 1 ? dupPairs().length : 0, due = dueList('').length;
+  const dgn = digestTargets().length;
   const steps = [
     { id: 'import', t: '① 集める：quick-ref の新しいAI Q&Aを取り込む', b: '☁️ 取り込む', n: -1 },
     { id: 'tidy', t: '② 整える：タグのない項目 ' + notag + '件／統合できそうな項目 ' + dup + '組', b: notag ? '🏷 タグを付ける' : '🔀 統合候補を見る', n: notag + dup },
-    { id: 'systemize', t: '③ 体系にする：分野のない項目 ' + un + '件', b: '📚 AIで体系に入れる', n: un },
-    { id: 'review', t: '④ 復習する：今日の復習 ' + due + '件', b: '🎓 復習する', n: due }
+    { id: 'digest', t: '③ 結論をまとめる：結論・経過が未整理の項目 ' + dgn + '件', b: '📝 AIでまとめる', n: dgn },
+    { id: 'systemize', t: '④ 体系にする：分野のない項目 ' + un + '件', b: '📚 AIで体系に入れる', n: un },
+    { id: 'review', t: '⑤ 復習する：今日の復習 ' + due + '件', b: '🎓 復習する', n: due }
   ];
   const nextId = (steps.find(x => x.n > 0) || {}).id;
   $('sysSteps').innerHTML = steps.map(x => '<div class="step' + (x.id === nextId ? ' next' : '') + '"><div class="st-t">' + esc(x.t) + (x.id === nextId ? ' <span class="kbadge">次はこれ</span>' : '') + '</div><button class="btn sm" data-sys="' + x.id + '">' + esc(x.b) + '</button></div>').join('') +
@@ -1643,7 +1765,7 @@ function drawSysTree() {
       h += groups.get(top).get(sub).sort(rowSort).map(e => {
         const u = e.understanding || 'unknown', warn = (e.prereq || []).filter(t => { const p = findEntryByTerm(t); return p && p.understanding !== 'known'; });
         return '<div class="card" data-open="' + esc(e.id) + '" style="margin:6px 0"><div class="c-top"><span class="c-term" style="font-size:16px">' + (e.lvl ? '<span class="lvl">' + LVL[e.lvl] + '</span>' : '') + esc(e.term) + '</span><span class="badge und-' + u + '">' + UND[u] + '</span></div>' +
-          (warn.length ? '<div class="c-meta">⚠️ 先に：' + warn.map(esc).join('、') + '</div>' : '') + '</div>';
+          conclLine(e) + (warn.length ? '<div class="c-meta">⚠️ 先に：' + warn.map(esc).join('、') + '</div>' : '') + '</div>';
       }).join('');
     }
     h += '</details>';
