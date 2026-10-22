@@ -333,6 +333,19 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
 </div>
 
 <!-- 設定・バックアップ -->
+<!-- 秘密らしき文字の確認 -->
+<div class="sheet" id="shSecret">
+  <div class="sh-head"><button id="scClose">閉じる</button><h2>秘密の確認</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <div class="box" id="scBody"></div>
+    <div class="row" style="margin-top:10px;flex-wrap:wrap">
+      <button class="btn primary" id="scMask">🙈 伏せ字にして保存</button>
+      <button class="btn" id="scAsIs">そのまま保存</button>
+    </div>
+    <div class="note" id="scNote">「伏せ字」は、パスワード・トークン・鍵のように見える部分を〔伏せ字〕に置き換えます。判定は目安なので、普通の長い英数字を拾うこともあります（その場合は「そのまま保存」）。</div>
+  </div>
+</div>
+
 <div class="sheet" id="shSet">
   <div class="sh-head"><button id="stClose">閉じる</button><h2>設定・バックアップ</h2><span style="min-width:56px"></span></div>
   <div class="sh-body">
@@ -344,6 +357,14 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
         <button class="btn" id="btnImportOwn">📥 読み込む</button>
       </div>
       <div class="note">データは、この端末のこのアプリの中にだけ保存されます。消えないよう、ときどき「書き出す」でバックアップしてください（ファイルアプリやiCloud Driveに保存）。</div>
+      <div class="lab" style="margin-top:12px">🔒 暗号化して書き出す</div>
+      <input id="sBkPass" type="password" placeholder="パスフレーズ（10文字以上）" autocomplete="off">
+      <input id="sBkPass2" type="password" placeholder="もう一度（書き出すときだけ）" autocomplete="off" style="margin-top:6px">
+      <button class="btn wide" id="btnExportEnc" style="margin-top:6px">🔒 暗号化して書き出す</button>
+      <div class="note">暗号化したファイルを「📥 読み込む」で選ぶときは、上の欄にパスフレーズを入れてから選びます。<b>パスフレーズを忘れると、開けません</b>（復旧の手段はありません）。</div>
+      <div class="lab" style="margin-top:12px">🔍 秘密らしき文字を探す</div>
+      <button class="btn wide" id="btnSecScan">🔍 辞書の中の、パスワード・トークンらしき行を探す</button>
+      <div class="note">保存済みの内容を、この端末の中だけで調べます。見つかったら、まとめて〔伏せ字〕にできます。</div>
     </div>
     <div class="box">
       <div class="lab">保存時のAI整理</div>
@@ -362,6 +383,15 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
         <button class="btn" id="btnSync">🔄 今すぐ同期</button>
       </div>
       <div class="note">下の「AIの接続」と同じ エンドポイント・同期トークン を、<b>両方の端末</b>に入れてください。最初に「今すぐ同期」を押すと、以後は保存のたびに自動で同期します。削除も反映されます。</div>
+      <div class="lab" style="margin-top:12px">🔒 同期の暗号化</div>
+      <div id="encStat" style="font-size:15px"></div>
+      <input id="sEncPass" type="password" placeholder="パスフレーズ（10文字以上）" autocomplete="off" style="margin-top:8px">
+      <input id="sEncPass2" type="password" placeholder="もう一度（新しく決めるときだけ）" autocomplete="off" style="margin-top:6px">
+      <div class="row" style="margin-top:8px;flex-wrap:wrap">
+        <button class="btn" id="btnEncOn">🔒 暗号化を始める／変える</button>
+        <button class="btn" id="btnEncEnter">🔑 他の端末と同じパスフレーズを入れる</button>
+      </div>
+      <div class="note">クラウドには、暗号化したデータだけを送ります（AES-256-GCM／PBKDF2 60万回）。パスフレーズはクラウドに送りません。<b>忘れると、クラウドのデータは誰にも開けません</b>（この端末の中のデータは残ります）。鍵はこの端末に保存するので、同期のたびの入力は要りません。2台目の端末では「🔑 同じパスフレーズを入れる」を使います。</div>
     </div>
     <div class="box">
       <div class="lab">quick-ref から取り込む</div>
@@ -401,7 +431,7 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
 
 <script>
 'use strict';
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.10.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -786,7 +816,15 @@ function updateSim() {
     $('simBox').innerHTML = sim.length ? '<div class="sim"><b>似ている項目があります</b>（同じことを聞いていないか確認）' + sim.map(x => '<div class="it"><span>📖 ' + esc(x.e.term) + (x.e.oneLine ? '<br><span class="note">' + esc(x.e.oneLine) + '</span>' : '') + '</span><span class="row" style="flex:none"><button class="btn sm" data-simopen="' + esc(x.e.id) + '">見る</button><button class="btn sm" data-simuse="' + esc(x.e.id) + '">ここに足す</button></span></div>').join('') + '</div>' : '';
   }, 250);
 }
-async function saveQA() {
+async function saveQA(mode) {
+  mode = typeof mode === 'string' ? mode : '';
+  if (mode !== 'asis') {
+    const fs = ['qQuestion', 'qAnswer', 'qJudgment'], hits = fs.flatMap(id => findSecrets($(id).value));
+    if (hits.length) {
+      if (mode === 'mask') fs.forEach(id => { $(id).value = maskSecrets($(id).value); });
+      else { showSecretSheet({ kind: 'save', hits }); return; }
+    }
+  }
   const question = $('qQuestion').value.trim(), answer = $('qAnswer').value.trim();
   if (!question) { toast('質問を入れてください'); return; }
   if (!answer) { toast('回答を入れてください'); return; }
@@ -922,9 +960,11 @@ function adoptAI(kind, v) {
 
 /* ───────── バックアップ・取り込み ───────── */
 function stamp() { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()); }
-function exportData() {
-  const payload = { app: 'knowledge-dictionary', version: 1, exportedAt: Date.now(), entries, qas };
-  const name = 'knowledge-dictionary_' + stamp() + '_' + entries.length + '項目.json';
+async function exportData(pass) {
+  let payload = { app: 'knowledge-dictionary', version: 1, exportedAt: Date.now(), entries, qas };
+  const encd = typeof pass === 'string' && pass;
+  if (encd) { const salt = crypto.getRandomValues(new Uint8Array(16)); payload = { app: 'knowledge-dictionary', version: 2, exportedAt: Date.now(), enc: await sealWith(await deriveKey(pass, salt, KD_ITER), b64e(salt), KD_ITER, payload) }; }
+  const name = 'knowledge-dictionary_' + stamp() + '_' + entries.length + '項目' + (encd ? '.暗号化' : '') + '.json';
   const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
   const url = URL.createObjectURL(blob), a = document.createElement('a');
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -934,6 +974,11 @@ function exportData() {
 }
 async function importOwn(file) {
   let o; try { o = JSON.parse(await file.text()); } catch (_) { toast('JSONとして読めませんでした'); return; }
+  if (o && o.app === 'knowledge-dictionary' && o.enc) {
+    const pw = $('sBkPass').value;
+    if (!pw) { toast('暗号化されたファイルです。「暗号化して書き出す」欄にパスフレーズを入れてから、もう一度選んでください'); return; }
+    try { toast('開いています…'); o = await openWith(await keyFromPassEnv(pw, o.enc), o.enc); } catch (_) { toast('パスフレーズが違うか、ファイルが壊れています'); return; }
+  }
   if (!o || o.app !== 'knowledge-dictionary' || !Array.isArray(o.entries) || !Array.isArray(o.qas)) { toast('知識辞書の書き出しファイルではありません'); return; }
   let ne = 0, nq = 0;
   const ee = [], qq = [];
@@ -974,11 +1019,76 @@ async function qrImportItems(items, silent) {
 }
 
 
+/* ───────── 暗号化（同期・バックアップ）AES-256-GCM / PBKDF2-SHA256 ───────── */
+const KD_ITER = 600000, KD_AAD = new TextEncoder().encode('knowledge-dictionary:1');
+const b64e = u => { let t = ''; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(t); };
+const b64d = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+async function deriveKey(pass, salt, iter) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(pass).normalize('NFKC')), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+}
+const rawOf = async key => b64e(new Uint8Array(await crypto.subtle.exportKey('raw', key)));
+const keyFromRaw = raw => crypto.subtle.importKey('raw', b64d(raw), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+async function sealWith(key, saltB64, iter, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: KD_AAD }, key, new TextEncoder().encode(JSON.stringify(obj))));
+  return { v: 1, alg: 'AES-256-GCM', kdf: 'PBKDF2-SHA256', iter, salt: saltB64, iv: b64e(iv), ct: b64e(ct) };
+}
+async function openWith(key, env) {
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64d(env.iv), additionalData: KD_AAD }, key, b64d(env.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+const envIter = env => { const n = Number(env && env.iter) || KD_ITER; return Math.min(Math.max(n, 100000), 5000000); };   // 悪意あるデータで固まらないよう範囲を限る
+async function keyFromPassEnv(pass, env) { return deriveKey(pass, b64d(env.salt), envIter(env)); }
+const syncEncOn = () => !!lsGet('kd_ek');
+let encForcePush = false;
+
+/* ───────── 秘密らしき文字の検出（保存時・既存データ） ───────── */
+const SECRET_G = SECRET_RE.map(r => new RegExp(r.source, r.flags.replace('g', '') + 'g'));
+function findSecrets(text) { return String(text || '').split('\n').filter(l => { const t = l.replace(/(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*〔伏せ字〕/gi, '').replace(/〔伏せ字〕/g, ''); return SECRET_RE.some(r => r.test(t)); }); }
+function maskSecrets(text) {
+  let t = String(text || '');
+  t = t.replace(/(password|passwd|secret|token|api[_-]?key)(\s*[:=]\s*)\S+/gi, '$1$2〔伏せ字〕');
+  SECRET_G.forEach((r, i) => { if (i !== 3) t = t.replace(r, '〔伏せ字〕'); });
+  return t;
+}
+const secPeek = l => esc(l.trim().slice(0, 10)) + '…（' + l.trim().length + '文字）';
+let secretCtx = null;
+function showSecretSheet(ctx) {
+  secretCtx = ctx;
+  if (ctx.kind === 'save') {
+    $('scBody').innerHTML = '<div><b>' + ctx.hits.length + '行</b>が、パスワード・トークン・鍵のように見えます。このまま保存すると、端末の中と、同期・バックアップに平文で残ります。</div><ul class="op">' + ctx.hits.slice(0, 6).map(l => '<li>' + secPeek(l) + '</li>').join('') + (ctx.hits.length > 6 ? '<li>ほか ' + (ctx.hits.length - 6) + '行</li>' : '') + '</ul>';
+    $('scMask').textContent = '🙈 伏せ字にして保存'; $('scAsIs').style.display = ''; $('scAsIs').textContent = 'そのまま保存';
+  } else {
+    $('scBody').innerHTML = ctx.items.length ? '<div>見つかった：<b>' + ctx.items.length + '件</b>（行数の合計 ' + ctx.total + '行）</div><ul class="op">' + ctx.items.slice(0, 12).map(x => '<li>' + esc(x.label) + '：' + x.n + '行</li>').join('') + (ctx.items.length > 12 ? '<li>ほか ' + (ctx.items.length - 12) + '件</li>' : '') + '</ul>' : '<div>パスワードやトークンらしき行は見つかりませんでした。</div>';
+    $('scMask').style.display = ctx.items.length ? '' : 'none'; $('scMask').textContent = '🙈 まとめて伏せ字にする'; $('scAsIs').style.display = 'none';
+  }
+  if (ctx.kind === 'save') $('scMask').style.display = '';
+  openSheet('shSecret');
+}
+function secretScan() {
+  const items = []; let total = 0;
+  for (const q of qas) { const n = [q.question, q.answer, q.judgment].reduce((a, t) => a + findSecrets(t).length, 0); if (n) { const e = entryById.get(q.entryId); items.push({ kind: 'qa', id: q.id, n, label: (e ? e.term : '?') + ' のQ&A「' + String(q.question || '').trim().slice(0, 12) + '」' }); total += n; } }
+  for (const e of entries) { const n = [e.note, e.oneLine, e.conclusion].reduce((a, t) => a + findSecrets(t).length, 0); if (n) { items.push({ kind: 'entry', id: e.id, n, label: e.term + ' の項目' }); total += n; } }
+  showSecretSheet({ kind: 'scan', items, total });
+}
+async function secretMaskAll() {
+  const c = secretCtx; if (!c || c.kind !== 'scan' || !c.items.length) return;
+  if (!confirm(c.items.length + '件の、秘密らしき部分を〔伏せ字〕に置き換えます。元に戻せません（バックアップ済みですか？）。よろしいですか？')) return;
+  const now = Date.now(), ee = [], qq = [];
+  for (const it of c.items) {
+    if (it.kind === 'qa') { const q = qaById.get(it.id); if (q) qq.push(Object.assign({}, q, { question: maskSecrets(q.question), answer: maskSecrets(q.answer), judgment: maskSecrets(q.judgment), updatedAt: now })); }
+    else { const e = entryById.get(it.id); if (e) ee.push(Object.assign({}, e, { note: maskSecrets(e.note), oneLine: maskSecrets(e.oneLine), conclusion: e.conclusion ? maskSecrets(e.conclusion) : e.conclusion, updatedAt: now })); }
+  }
+  if (ee.length) await writeEntries(ee); if (qq.length) await writeQAs(qq);
+  closeSheet('shSecret'); refresh(); toast('伏せ字にしました：' + (ee.length + qq.length) + '件');
+}
+
 /* ───────── 端末どうしの同期（Worker の /sync/knowledge-dictionary） ───────── */
 function getTombs() { try { return JSON.parse(lsGet('kd_tomb') || '{}') || {}; } catch (_) { return {}; } }
 function setTombs(t) { lsSet('kd_tomb', JSON.stringify(t)); }
 function addTomb(ids) { const t = getTombs(), now = Date.now(); ids.forEach(i => { t[i] = now; }); setTombs(t); scheduleSync(); }
-let syncBusy = false, syncTimer = null, syncMsg = '';
+let syncBusy = false, syncTimer = null, syncMsg = '';   // 暗号化の鍵は kd_ek（この端末のみ）・salt は kd_esalt
 function connDesc() { const c = aiConfig(); let h = c.endpoint; try { h = new URL(c.endpoint).host; } catch (_) {} return h + '／トークン ' + c.token.slice(0, 2) + '…' + c.token.slice(-2) + '（' + c.token.length + '文字）'; }
 function syncReady() { const c = aiConfig(); return !!(c.endpoint && c.token); }
 function scheduleSync() {
@@ -1040,6 +1150,19 @@ async function kdSync(show) {
     else if (r.status === 401 || r.status === 403) throw new Error('トークンが違います（' + r.status + '）');
     else if (!r.ok) throw new Error('受信失敗（' + r.status + '）');
     else { const j = await r.json(); remote = (j && j.data) || {}; }
+    let remoteWasEnc = false;
+    if (remote && remote.enc) {
+      remoteWasEnc = true; const env = remote.enc;
+      try {
+        if (!lsGet('kd_ek')) throw new Error('NOKEY');
+        if (lsGet('kd_esalt') !== env.salt) throw new Error('SALT');
+        remote = await openWith(await keyFromRaw(lsGet('kd_ek')), env);
+      } catch (x) {
+        const mm = x && x.message;
+        if (encForcePush) remote = {};
+        else throw new Error(mm === 'NOKEY' ? 'クラウドは暗号化されています。設定の「🔑 他の端末と同じパスフレーズを入れる」で鍵を入れてください（送信は止めています）' : mm === 'SALT' ? '他の端末でパスフレーズが変えられました。「🔑 …」で新しいパスフレーズを入れ直してください（送信は止めています）' : '復号できませんでした（パスフレーズ違い、またはデータ破損）。送信は止めています');
+      }
+    }
     const rcE = Array.isArray(remote.entries) ? remote.entries.length : 0, rcQ = Array.isArray(remote.qas) ? remote.qas.length : 0, localBefore = entries.length;
     const m = mergeRemote(remote);
     const oldE = new Set(entries.map(e => e.id)), oldQ = new Set(qas.map(q => q.id));
@@ -1047,14 +1170,16 @@ async function kdSync(show) {
     await idbPutMany('entries', entries); await idbPutMany('qas', qas);
     await idbDel('entries', [...oldE].filter(i => !m.em.has(i))); await idbDel('qas', [...oldQ].filter(i => !m.qm.has(i)));
     const first = r.status === 404; let sent = false;
-    if (m.changed || first) {
-      const body = JSON.stringify({ data: { app: 'knowledge-dictionary', version: 1, entries, qas, tombs: m.tombs } });
+    const encOn = syncEncOn(), migrate = encOn && (!remoteWasEnc || encForcePush);
+    if (m.changed || first || migrate) {
+      const payload = { app: 'knowledge-dictionary', version: 1, entries, qas, tombs: m.tombs };
+      const body = JSON.stringify({ data: encOn ? { app: 'knowledge-dictionary', version: 2, enc: await sealWith(await keyFromRaw(lsGet('kd_ek')), lsGet('kd_esalt'), KD_ITER, payload) } : payload });
       const w = await fetch(url, { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, hdr), body, signal: ctl(45000) });
       sent = true;
       if (!w.ok) throw new Error(w.status === 404 || w.status === 400 ? '送信失敗（' + w.status + '）：Worker がこの名前を受け付けません。sync-worker に knowledge-dictionary の置き場を足す必要があります' : '送信失敗（' + w.status + '）');
     }
     lsSet('kd_sync', '1'); lsSet('kd_last_sync', String(Date.now()));
-    syncMsg = '最終同期 ' + new Date().toLocaleTimeString('ja-JP') + '\nクラウド：項目 ' + rcE + '・Q&A ' + rcQ + (r.status === 404 ? '（まだ空でした）' : '') + '\nこの端末：同期前 ' + localBefore + '項目 → 同期後 ' + entries.length + '項目・Q&A ' + qas.length + '\n受信 ' + m.recv + '件／クラウドへ送信：' + (sent ? 'した' : 'なし（変更なし）');
+    syncMsg = '最終同期 ' + new Date().toLocaleTimeString('ja-JP') + '\nクラウド：項目 ' + rcE + '・Q&A ' + rcQ + (r.status === 404 ? '（まだ空でした）' : '') + '\nこの端末：同期前 ' + localBefore + '項目 → 同期後 ' + entries.length + '項目・Q&A ' + qas.length + '\n受信 ' + m.recv + '件／クラウドへ送信：' + (sent ? 'した' : 'なし（変更なし）') + (encOn ? '\n🔒 暗号化して送受信しています' : '\n🔓 暗号化なし（クラウドには平文）');
     refresh(); renderSettings(); if (viewId && entryById.get(viewId)) { try { openEntry(viewId); } catch (_) {} }
     if (show) toast('同期できました：項目 ' + entries.length + '・Q&A ' + qas.length);
     return true;
@@ -1063,7 +1188,42 @@ async function kdSync(show) {
     syncMsg = '同期できませんでした：' + msg; renderSettings();
     if (show) toast(syncMsg.slice(0, 90));
     return false;
-  } finally { syncBusy = false; }
+  } finally { syncBusy = false; encForcePush = false; }
+}
+
+async function encStart() {
+  const p = $('sEncPass').value, p2 = $('sEncPass2').value;
+  if (p.length < 10) { toast('パスフレーズは10文字以上にしてください'); return; }
+  if (p !== p2) { toast('2回の入力が一致しません'); return; }
+  if (!syncReady()) { toast('先に「AIの接続」のエンドポイントとトークンを入れてください'); return; }
+  if (!confirm('同期データを暗号化します。パスフレーズを忘れると、クラウドのデータは誰にも開けません（この端末のデータは残ります）。\n\nすでにクラウドが別のパスフレーズで暗号化されている場合は、この端末の内容で置き換わります。\nよろしいですか？')) return;
+  toast('鍵を作っています…（数秒）');
+  try {
+    if (syncEncOn()) await kdSync(false);   // 変える前に、いまの鍵で最新を取り込む
+    const salt = crypto.getRandomValues(new Uint8Array(16)), key = await deriveKey(p, salt, KD_ITER);
+    lsSet('kd_ek', await rawOf(key)); lsSet('kd_esalt', b64e(salt));
+    $('sEncPass').value = ''; $('sEncPass2').value = '';
+    encForcePush = true; await kdSync(true);
+  } catch (x) { toast('暗号化を始められませんでした：' + String((x && x.message) || x).slice(0, 70)); }
+  renderSettings();
+}
+async function encEnter() {
+  const p = $('sEncPass').value, c = aiConfig();
+  if (!p) { toast('パスフレーズを入れてください'); return; }
+  if (!syncReady()) { toast('先に「AIの接続」のエンドポイントとトークンを入れてください'); return; }
+  try {
+    toast('確かめています…（数秒）');
+    const r = await fetch(c.endpoint + '/sync/knowledge-dictionary', { headers: { Authorization: 'Bearer ' + c.token } });
+    if (r.status === 404) { toast('クラウドにまだデータがありません。先に元の端末で暗号化を始めてください'); return; }
+    if (!r.ok) throw new Error('受信失敗（' + r.status + '）');
+    const j = await r.json(), env = j && j.data && j.data.enc;
+    if (!env) { toast('クラウドは暗号化されていません。この端末で「暗号化を始める」を使ってください'); return; }
+    const key = await keyFromPassEnv(p, env);
+    try { await openWith(key, env); } catch (_) { toast('パスフレーズが違います'); return; }
+    lsSet('kd_ek', await rawOf(key)); lsSet('kd_esalt', env.salt); $('sEncPass').value = '';
+    await kdSync(true);
+  } catch (x) { toast('入れられませんでした：' + String((x && x.message) || x).slice(0, 70)); }
+  renderSettings();
 }
 
 async function qrCloudImport(silent) {
@@ -1089,6 +1249,7 @@ async function renderSettings() {
   $('stStat').innerHTML = '項目 <b>' + entries.length + '</b>　Q&amp;A <b>' + qas.length + '</b><br><span class="note">最後のバックアップ：' + (last ? dstr(last) : 'まだありません') + esc(pers) + '</span>';
   const lastS = Number(lsGet('kd_last_sync')) || 0;
   $('syncStat').innerHTML = syncReady() ? (lsGet('kd_sync') === '1' ? '自動同期：オン' : '自動同期：オフ（「今すぐ同期」で開始）') + '<br><span class="note" style="white-space:pre-line">' + esc(syncMsg || (lastS ? '最終同期 ' + dstr(lastS) : 'まだ同期していません')) + '</span><br><span class="note">接続先：' + esc(connDesc()) + '</span>' : '<span class="note">未設定：下の「AIの接続」にエンドポイントとトークンを入れてください</span>';
+  $('encStat').innerHTML = syncEncOn() ? '🔒 <b>オン</b>：クラウドには暗号化したデータだけを送ります（鍵はこの端末に保存）' : '🔓 <b>オフ</b>：クラウドの同期データは暗号化されていません';
   const c = aiConfig();
   $('sEndpoint').value = lsGet('kd_endpoint'); $('sToken').value = ''; $('sProvider').value = c.provider; $('sModel').value = lsGet('kd_model');
   $('sQrAuto').checked = lsGet('kd_qrauto') === '1'; $('sAutoOrg').checked = lsGet('kd_autoorg') === '1'; $('sLimit').value = lsGet('kd_limit'); $('sSys').value = lsGet('kd_sys'); $('usageStat').textContent = usageLine();
@@ -1364,7 +1525,19 @@ function wire() {
     else if (d.simuse) { const en = entryById.get(d.simuse); if (en) { $('qTerm').value = en.term; onTermChange(); updateSim(); toast('「' + en.term + '」に足します'); } }
   });
   $('stClose').addEventListener('click', () => closeSheet('shSet'));
-  $('btnExport').addEventListener('click', exportData);
+  $('btnExport').addEventListener('click', () => { void exportData(); });
+  $('btnExportEnc').addEventListener('click', async () => {
+    const a = $('sBkPass').value, b = $('sBkPass2').value;
+    if (a.length < 10) { toast('パスフレーズは10文字以上にしてください'); return; }
+    if (a !== b) { toast('2回の入力が一致しません'); return; }
+    toast('暗号化しています…（数秒）'); await exportData(a); $('sBkPass2').value = '';
+  });
+  $('btnSecScan').addEventListener('click', secretScan);
+  $('scClose').addEventListener('click', () => closeSheet('shSecret'));
+  $('scAsIs').addEventListener('click', () => { closeSheet('shSecret'); if (secretCtx && secretCtx.kind === 'save') void saveQA('asis'); });
+  $('scMask').addEventListener('click', () => { if (!secretCtx) return; if (secretCtx.kind === 'save') { closeSheet('shSecret'); void saveQA('mask'); } else void secretMaskAll(); });
+  $('btnEncOn').addEventListener('click', () => { void encStart(); });
+  $('btnEncEnter').addEventListener('click', () => { void encEnter(); });
   $('btnImportOwn').addEventListener('click', () => $('fileOwn').click());
   $('btnQRCloud').addEventListener('click', () => { void qrCloudImport(false); });
   $('sQrAuto').addEventListener('change', () => { lsSet('kd_qrauto', $('sQrAuto').checked ? '1' : '0'); toast($('sQrAuto').checked ? '起動時の自動取り込み：オン' : '起動時の自動取り込み：オフ'); });
