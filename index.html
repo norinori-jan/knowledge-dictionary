@@ -353,6 +353,27 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
   </div>
 </div>
 
+<div class="sheet" id="shCode">
+  <div class="sh-head"><button id="cdClose">閉じる</button><h2>🛠 コードを作る</h2><span style="min-width:56px"></span></div>
+  <div class="sh-body">
+    <label class="lab" for="cdTask">作りたいこと</label>
+    <textarea id="cdTask" rows="3" placeholder="例：iPhoneで、ボタンを押すと配列の途中の1件を消して、一覧を描き直す"></textarea>
+    <div class="lab" style="margin-top:8px">言語</div>
+    <div class="chips" id="cdLang"></div>
+    <button class="btn pri wide" id="cdFind" style="margin-top:10px">① 使う部品を絞り込む（AIなし・無料）</button>
+    <div id="cdCand"></div>
+    <div id="cdMore" style="display:none">
+      <input id="cdAddQ" placeholder="部品を探して足す（例：splice、flex、Unblock）" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <div id="cdAddList"></div>
+      <button class="btn wide" id="cdNarrow" style="margin-top:8px">🧠 AIに絞ってもらう（少量のトークン）</button>
+    </div>
+    <details class="box" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">私のルール（毎回つけます）</summary><textarea id="cdRules" rows="7" style="margin-top:8px"></textarea><div class="note">AIがコードを書くときの決まりです。自分用に書き換えられます。</div></details>
+    <div class="row" style="flex-wrap:wrap"><button class="btn pri" id="cdGen">② 🛠 コードを作る（AI）</button><button class="btn" id="cdDraft">✍ AIなしで下書き</button></div>
+    <div class="note" id="cdMeta"></div>
+    <div id="cdOut"></div>
+  </div>
+</div>
+
 <div class="sheet" id="shPack">
   <div class="sh-head"><button id="pxClose">閉じる</button><h2>📦 辞書パック</h2><button id="pkStudy">🎓 復習</button></div>
   <div class="sh-body">
@@ -467,7 +488,7 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
 
 <script>
 'use strict';
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.12.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -1567,6 +1588,25 @@ function wire() {
   });
   $('stClose').addEventListener('click', () => closeSheet('shSet'));
   $('btnExport').addEventListener('click', () => { void exportData(); });
+  $('cdClose').addEventListener('click', () => closeSheet('shCode'));
+  $('cdFind').addEventListener('click', cdFind);
+  $('cdNarrow').addEventListener('click', () => { void cdNarrowAI(); });
+  $('cdGen').addEventListener('click', () => { void cdGenerate(); });
+  $('cdDraft').addEventListener('click', cdDraft);
+  $('cdAddQ').addEventListener('input', cdAddSearch);
+  $('cdRules').addEventListener('input', () => lsSet('kd_coderules', $('cdRules').value.slice(0, 1200)));
+  $('shCode').addEventListener('click', async ev => {
+    const l = ev.target.closest('[data-cdl]'); if (l) { cdSt.lang = l.dataset.cdl; cdDrawLang(); return; }
+    const a = ev.target.closest('[data-cdadd]'); if (a) { cdSt.cands.unshift({ t: 'pack', id: a.dataset.cdadd, on: true }); $('cdAddQ').value = ''; $('cdAddList').innerHTML = ''; cdDrawCand(); return; }
+    const o = ev.target.closest('[data-open]'); if (o) { openEntry(o.dataset.open); return; }
+    const d = ev.target.closest('[data-cdo]'); if (d) {
+      const k = d.dataset.cdo;
+      if (k === 'copy') await copyText(cdSt.code, 'コピーしました');
+      else if (k === 'ok' || k === 'ng') { cdSt.result = k; document.querySelectorAll('#cdOut [data-cdo="ok"],#cdOut [data-cdo="ng"]').forEach(x => x.classList.toggle('on', x.dataset.cdo === k)); }
+      else if (k === 'save') await cdSave();
+    }
+  });
+  $('shCode').addEventListener('change', ev => { const c = ev.target.closest('[data-cdc]'); if (!c) return; const [t, ...r] = c.dataset.cdc.split(':'), id = r.join(':'), x = cdSt.cands.find(y => y.t === t && y.id === id); if (x) { x.on = c.checked; const n = cdSt.cands.filter(y => y.on).length; const h = document.querySelector('#cdCand .sec-h'); if (h) h.textContent = '使う部品（' + n + '件を使う）'; } });
   $('btnPackImport').addEventListener('click', () => $('filePack').click());
   $('filePack').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importPack(f); });
   $('btnPackOpen').addEventListener('click', () => openPack(''));
@@ -1594,7 +1634,8 @@ function wire() {
   document.addEventListener('click', ev => {
     const b = ev.target.closest('[data-pk]'); if (b && !$('shPackEntry').contains(b)) { openPackEntry(b.dataset.pk); return; }
     if (b && $('shPackEntry').contains(b)) { openPackEntry(b.dataset.pk); return; }
-    const o = ev.target.closest('[data-pkopen]'); if (o) openPack(o.dataset.pkq || '');
+    const o = ev.target.closest('[data-pkopen]'); if (o) { openPack(o.dataset.pkq || ''); return; }
+    if (ev.target.closest('[data-codeopen]')) openCode();
   });
   $('btnExportEnc').addEventListener('click', async () => {
     const a = $('sBkPass').value, b = $('sBkPass2').value;
@@ -2057,10 +2098,9 @@ function packRelHtml(e) {
 /* 一覧に出すパックの案内と検索結果 */
 function renderPackBlock() {
   const bar = $('packBar'), box = $('packBox'); if (!bar || !box) return;
-  if (!pack.length) { bar.innerHTML = ''; box.innerHTML = ''; return; }
-  const due = pkDueIds().length;
-  bar.innerHTML = searchQuery ? '' : '<div class="pk-bar" data-pkopen="1">📦 辞書パック <b>' + pack.length + '</b>件（AIなしで引く）' + (due ? '　🎓 復習 ' + due + '枚' : '') + ' ›</div>';
-  if (!searchQuery.trim()) { box.innerHTML = ''; return; }
+  const due = pack.length ? pkDueIds().length : 0;
+  bar.innerHTML = searchQuery ? '' : '<div class="chips" style="margin:8px 0">' + (pack.length ? '<button class="fchip" data-pkopen="1">📦 辞書パック ' + pack.length + '件' + (due ? '・🎓復習' + due + '枚' : '') + '</button>' : '') + '<button class="fchip" data-codeopen="1">🛠 コードを作る</button></div>';
+  if (!pack.length || !searchQuery.trim()) { box.innerHTML = ''; return; }
   const hits = packSearch(searchQuery, {}); if (!hits.length) { box.innerHTML = ''; return; }
   const toks = tokensOf(searchQuery);
   box.innerHTML = '<div class="sec-h">📦 辞書パックでも見つかりました（' + hits.length + '件）</div><div class="box" style="padding:4px 12px">' + hits.slice(0, 4).map(e => '<div class="pk-hit" data-pk="' + esc(e.id) + '"><b>' + hl(e.term, toks) + '</b> ' + pkBadges(e) + '<div class="note">' + hl(e.summary, toks) + '</div></div>').join('') + '</div>' + (hits.length > 4 ? '<button class="btn wide" data-pkopen="1" data-pkq="' + esc(searchQuery) + '">パックで ' + hits.length + '件すべて見る</button>' : '');
@@ -2092,6 +2132,131 @@ function pkStudyAnswer(k) {
   pr[id] = { s, c: (cur.c || 0) + 1, n: now + days * 86400000 }; lsSet('kd_pk', JSON.stringify(pr));
   pkS.skip.add(id); pkS.done++; pkStudyDraw(); renderPackBlock();
 }
+
+/* ───────── コードを作る（辞書から部品を絞り込み、それを根拠に書く） ───────── */
+const CD_LANGS = [['auto', 'おまかせ'], ['web', 'HTML/CSS/JS'], ['js', 'JavaScript'], ['ps', 'PowerShell'], ['py', 'Python'], ['sql', 'SQL'], ['sh', 'シェル'], ['git', 'git']];
+const CD_MAP = { web: ['html', 'css', 'js'], js: ['js'], ps: ['ps', 'win'], py: ['py'], sql: ['sql'], sh: ['sh'], git: ['git', 'gh'] };
+const CD_RULES = '・アプリは「単一ファイルHTMLのPWA」。ビルドツール・フレームワーク（React/Vue/npm）を前提にしない\n・PowerShellは、貼ってそのまま動く形にする。「<ここに入れる>」のような穴あきは作らない。if (…) { … } の次の行に else を置かない（} else { を同じ行に）。複数行の貼り付けは & { … } で包む\n・鍵・トークン・パスワードの値は書かない\n・説明は日本語で、やさしく、短く';
+let cdSt = { lang: 'auto', cands: [], text: '', code: '', lang2: '', result: '', busy: false };
+const cdRules = () => (lsGet('kd_coderules') || CD_RULES).slice(0, 1200);
+function cdGuess(task) {
+  const t = task.toLowerCase();
+  if (/powershell|ps1|\bps\b|win|レジストリ|フォルダ|ダウンロード/.test(t) && !/html|css|画面/.test(t)) return 'ps';
+  if (/python|pandas|\.py\b/.test(t)) return 'py';
+  if (/sql|テーブル|select\b|データベース/.test(t)) return 'sql';
+  if (/\bgit\b|コミット|ブランチ|プッシュ/.test(t)) return 'git';
+  if (/html|css|画面|ボタン|pwa|iphone|スマホ|スクロール/.test(t)) return 'web';
+  return 'js';
+}
+const cdLangKey = () => (cdSt.lang === 'auto' ? cdGuess($('cdTask').value) : cdSt.lang);
+function cdPool(task, langs, k) {
+  const out = [], seen = new Set(), add = e => { if (e && !seen.has(e.id) && (!langs || langs.includes(e.lang))) { seen.add(e.id); out.push(e); } };
+  packRetrieve(task, 80).forEach(add);
+  packSearch(task, {}).slice(0, 60).forEach(add);
+  return out.slice(0, k || 12);
+}
+function cdFind() {
+  const task = $('cdTask').value.trim(); if (!task) { toast('作りたいことを書いてください'); return; }
+  const key = cdLangKey(), langs = CD_MAP[key] || null;
+  const pk = cdPool(task, langs, 10), own = retrieve(task, 4);
+  const pkOn = new Set(pk.filter(e => e.confidence !== 'low').slice(0, 6).map(e => e.id));
+  cdSt.cands = pk.map(e => ({ t: 'pack', id: e.id, on: pkOn.has(e.id) })).concat(own.map((e, i) => ({ t: 'own', id: e.id, on: i < 3 })));
+  cdSt.key = key; cdDrawCand(); $('cdMore').style.display = '';
+  $('cdMeta').textContent = '言語：' + (CD_LANGS.find(x => x[0] === key) || [0, key])[1] + (cdSt.lang === 'auto' ? '（おまかせで判断）' : '') + '　' + usageLine();
+}
+function cdDrawCand() {
+  const row = c => {
+    const e = c.t === 'pack' ? packById.get(c.id) : entryById.get(c.id); if (!e) return '';
+    const sub = c.t === 'pack' ? e.summary : ((conclusionOf(e) || {}).text || e.oneLine || '');
+    return '<label class="pk-hit" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-cdc="' + c.t + ':' + esc(c.id) + '"' + (c.on ? ' checked' : '') + ' style="width:22px;height:22px;margin-top:3px;flex:none"><span style="flex:1"><b>' + (c.t === 'pack' ? '' : '📖 ') + esc(c.t === 'pack' ? e.term : e.term) + '</b> ' + (c.t === 'pack' ? pkBadges(e) : '') + '<div class="note">' + esc(String(sub).slice(0, 110)) + '</div></span>' + (c.t === 'pack' ? '<button class="btn sm" data-pk="' + esc(c.id) + '">見る</button>' : '<button class="btn sm" data-open="' + esc(c.id) + '">見る</button>') + '</label>';
+  };
+  const P = cdSt.cands.filter(c => c.t === 'pack'), O = cdSt.cands.filter(c => c.t === 'own'), n = cdSt.cands.filter(c => c.on).length;
+  $('cdCand').innerHTML = '<div class="sec-h">使う部品（' + n + '件を使う）</div>' + (P.length ? '<div class="note">📦 パック</div><div class="box" style="padding:4px 12px">' + P.map(row).join('') + '</div>' : '<div class="note">パックから関係する部品は見つかりませんでした。下の欄で探して足せます。</div>') + (O.length ? '<div class="note">📖 自分の辞書（自分の判断・結論が材料になります）</div><div class="box" style="padding:4px 12px">' + O.map(row).join('') + '</div>' : '') + '<div class="note">要らないものは外し、足りないものは下で足してください。外すほど、的が絞れます。</div>';
+}
+function cdAddSearch() {
+  const q = $('cdAddQ').value.trim(), langs = CD_MAP[cdSt.key] || null;
+  if (!q) { $('cdAddList').innerHTML = ''; return; }
+  const have = new Set(cdSt.cands.map(c => c.t + ':' + c.id)), hits = packSearch(q, {}).filter(e => (!langs || langs.includes(e.lang)) && !have.has('pack:' + e.id)).slice(0, 6);
+  $('cdAddList').innerHTML = hits.length ? '<div class="box" style="padding:4px 12px">' + hits.map(e => '<div class="pk-hit" data-cdadd="' + esc(e.id) + '"><b>＋ ' + esc(e.term) + '</b> ' + pkBadges(e) + '<div class="note">' + esc(e.summary) + '</div></div>').join('') + '</div>' : '<div class="note">見つかりませんでした。</div>';
+}
+async function cdNarrowAI() {
+  if (cdSt.busy) return; const task = $('cdTask').value.trim(); if (!task) { toast('作りたいことを書いてください'); return; }
+  const langs = CD_MAP[cdSt.key] || null, pool = [], seen = new Set();
+  cdPool(task, langs, 40).forEach(e => { if (!seen.has(e.id)) { seen.add(e.id); pool.push(e); } });
+  cdSt.cands.filter(c => c.t === 'pack').forEach(c => { const e = packById.get(c.id); if (e && !seen.has(e.id)) { seen.add(e.id); pool.push(e); } });
+  if (!pool.length) { toast('絞り込む部品がありません'); return; }
+  cdSt.busy = true; $('cdNarrow').disabled = true; $('cdNarrow').textContent = '🧠 絞っています…';
+  try {
+    const raw = await callAI(redact('次の【作りたいこと】を実現するのに必要な部品だけを、【部品の一覧】から選んでください。必要最小限にしてください（多くても8個）。足りない部品があれば、それも書いてください。\nJSONだけを返してください: {"use":["id（一覧にあるもの）"],"missing":["足りない部品・調べるべきこと（最大4）"]}\n\n【作りたいこと】\n' + task + '\n\n【部品の一覧】\n' + pool.map(e => e.id + ' | ' + pkHead(e) + ' | ' + e.summary.slice(0, 60)).join('\n')).text, { maxTokens: 500 });
+    const a = raw.indexOf('{'), b = raw.lastIndexOf('}'), o = JSON.parse(raw.slice(a, b + 1)), use = new Set((Array.isArray(o.use) ? o.use : []).map(String).filter(id => packById.has(id)));
+    if (!use.size) throw new Error('AIが部品を選べませんでした');
+    const have = new Set(cdSt.cands.filter(c => c.t === 'pack').map(c => c.id));
+    cdSt.cands.forEach(c => { if (c.t === 'pack') c.on = use.has(c.id); });
+    use.forEach(id => { if (!have.has(id)) cdSt.cands.unshift({ t: 'pack', id, on: true }); });
+    cdSt.cands.sort((x, y) => (x.t === y.t ? 0 : x.t === 'pack' ? -1 : 1) || ((y.on ? 1 : 0) - (x.on ? 1 : 0)));
+    cdDrawCand();
+    $('cdMeta').innerHTML = '絞り込みました。' + (Array.isArray(o.missing) && o.missing.length ? '<br>⚠ 足りないかもしれない部品：' + o.missing.slice(0, 4).map(x => esc(String(x).slice(0, 60))).join('、') : '') + '<br>' + esc(usageLine());
+  } catch (x) { toast('絞り込めませんでした：' + String((x && x.message) || x).slice(0, 70)); }
+  cdSt.busy = false; $('cdNarrow').disabled = false; $('cdNarrow').textContent = '🧠 AIに絞ってもらう（少量のトークン）';
+}
+function cdParts() {
+  return cdSt.cands.filter(c => c.on).map(c => c.t === 'pack' ? { t: 'pack', e: packById.get(c.id) } : { t: 'own', e: entryById.get(c.id) }).filter(x => x.e);
+}
+function cdBuildPrompt(task, parts) {
+  const pk = parts.filter(x => x.t === 'pack').map(x => '■' + x.e.term + '（' + pkLangName(x.e.lang) + (x.e.verified ? '・確認済み' : '') + '）\n概要：' + x.e.summary + (x.e.form ? '\n形：' + x.e.form.slice(0, 500) : '') + (x.e.example ? '\n例：' + x.e.example.slice(0, 600) : '') + (x.e.mistakes.length ? '\nよくある間違い：' + x.e.mistakes.slice(0, 4).join('／') : '')).join('\n\n');
+  const ow = parts.filter(x => x.t === 'own').map(x => '■' + x.e.term + '\n' + ((conclusionOf(x.e) || {}).text || x.e.oneLine || '') + (x.e.note ? '\n自分の理解：' + x.e.note.slice(0, 300) : '')).join('\n\n');
+  return '次の【作りたいこと】を、コードで実装してください。【使う部品】の「形」「例」「よくある間違い」に従ってください。\nルール:\n- 部品にない書き方は、確信があるものだけ使い、使ったら最後に「辞書にない書き方」として挙げる\n- 【私のルール】を必ず守る\n- 出力は次の3つだけ：\n  1) コード（コードブロック1つ。貼ってそのまま動く形。穴あき・省略は禁止）\n  2) 使った部品（見出し語を並べる）\n  3) 注意・確かめ方（3行以内）\n\n【私のルール】\n' + cdRules() + '\n\n【作りたいこと】\n' + task + '\n\n【使う部品（辞書パック）】\n' + (pk || '（なし）') + (ow ? '\n\n【自分の辞書の判断（パックより優先）】\n' + ow : '');
+}
+function cdSplit(text) {
+  const m = /```([A-Za-z0-9#+-]*)\n([\s\S]*?)```/.exec(text);
+  return m ? { code: m[2].replace(/\s+$/, ''), lang: m[1].toLowerCase(), rest: (text.slice(0, m.index) + text.slice(m.index + m[0].length)).trim() } : { code: '', lang: '', rest: text.trim() };
+}
+function cdSyntax(code, lang) {
+  if (!/^(js|javascript|)$/.test(lang) || !code) return '';
+  if (/<\/?[a-z][\s\S]*>/i.test(code.slice(0, 200)) && !/^\s*(const|let|var|function|\/\/|async|\(|import|class)/.test(code)) return '';
+  try { new Function(code); return '<span style="color:var(--knw)">✅ JavaScript の構文は読めました（実行はしていません）</span>'; } catch (e) { return '<span style="color:var(--unk)">⚠ 構文エラーの可能性：' + esc(String(e.message).slice(0, 80)) + '</span>'; }
+}
+function cdShow(res, drafted) {
+  const sp = cdSplit(res), code = sp.code || (drafted ? res : ''), rest = sp.code ? sp.rest : (drafted ? '' : res);
+  cdSt.text = res; cdSt.code = code; cdSt.drafted = !!drafted; cdSt.result = '';
+  $('cdOut').innerHTML = '<div class="sec-h">' + (drafted ? '下書き（部品の例をつなげただけ）' : '結果') + '</div>' + (code ? '<pre class="pk-code">' + esc(code) + '</pre><div style="margin:4px 0">' + cdSyntax(code, sp.lang) + '</div><div class="row"><button class="btn" data-cdo="copy">📋 コードをコピー</button></div>' : '') + (rest ? '<div class="box">' + rich(rest) + '</div>' : '') +
+    '<div class="sec-h">試した結果</div><div class="und-row"><button class="und-known" data-cdo="ok">✅ 動いた</button><button class="und-unknown" data-cdo="ng">❌ 動かなかった</button></div><input id="cdMemo" placeholder="メモ（動かなかった理由、直したところ など）"><button class="btn wide" data-cdo="save" style="margin-top:8px">📌 辞書に残す（試した結果つき）</button>';
+}
+async function cdGenerate() {
+  if (cdSt.busy) return; const task = $('cdTask').value.trim(); if (!task) { toast('作りたいことを書いてください'); return; }
+  const parts = cdParts(); if (!parts.length) { toast('先に「① 使う部品を絞り込む」を押してください（部品なしでも作れますが、的が外れやすくなります）'); return; }
+  const rd = redact(cdBuildPrompt(task, parts));
+  cdSt.busy = true; $('cdGen').disabled = true; $('cdGen').textContent = '🛠 作っています…（最大90秒）'; $('cdOut').innerHTML = '';
+  try {
+    const out = (await callAI(rd.text, { maxTokens: 2500 })).trim(); if (!out) throw new Error('AIの返事が空でした');
+    cdSt.usedIds = parts.map(x => (x.t === 'pack' ? 'pack:' : 'own:') + x.e.id); cdShow(out, false);
+    $('cdMeta').innerHTML = esc(usageLine()) + (rd.removed ? '<br>⚠ 秘密らしき ' + rd.removed + '行は、AIに送っていません。' : '');
+  } catch (x) { $('cdOut').innerHTML = '<div class="banner">' + esc((x && x.message) || String(x)) + '</div>'; }
+  cdSt.busy = false; $('cdGen').disabled = false; $('cdGen').textContent = '② 🛠 コードを作る（AI）';
+}
+function cdDraft() {
+  const task = $('cdTask').value.trim(); if (!task) { toast('作りたいことを書いてください'); return; }
+  const parts = cdParts().filter(x => x.t === 'pack' && x.e.example); if (!parts.length) { toast('例のある部品を選んでください'); return; }
+  const cm = (CD_MAP[cdSt.key] || ['js']).includes('ps') ? '#' : (cdSt.key === 'py' ? '#' : (cdSt.key === 'sql' ? '--' : '//'));
+  const txt = cm + ' 作りたいこと：' + task.replace(/\n/g, ' ') + '\n' + cm + ' （部品の例をつなげた下書きです。そのままでは動かないことがあります）\n\n' + parts.map(x => cm + ' --- ' + pkHead(x.e) + ' ---\n' + x.e.example).join('\n\n');
+  cdSt.usedIds = parts.map(x => 'pack:' + x.e.id); cdShow(txt, true);
+}
+async function cdSave() {
+  if (!cdSt.text) return;
+  const now = Date.now(), task = $('cdTask').value.trim(), c = aiConfig(), memo = ($('cdMemo') || {}).value || '';
+  let term = firstLine(task).slice(0, 30), n = 2; const base = term; while (findEntryByTerm(term)) term = base + ' ' + (n++);
+  const used = (cdSt.usedIds || []).map(k => k.startsWith('pack:') ? packById.get(k.slice(5)) : entryById.get(k.slice(4))).filter(Boolean);
+  const tags = union(['コード'], used.flatMap(e => e.tags || [])).slice(0, 6), related = [...new Set(used.map(e => (e.lang ? pkHead(e) : e.term)))].slice(0, 6);
+  const judg = (cdSt.result === 'ok' ? '動いた（確認済み）' : cdSt.result === 'ng' ? '動かなかった' : '') + (memo ? (cdSt.result ? '：' : '') + memo : '');
+  const e = { id: uid(), term, kind: 'howto', oneLine: '', tags, related, note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
+  await writeEntries([e]);
+  await writeQAs([{ id: uid(), entryId: e.id, question: task, answer: cdSt.text, judgment: judg, sourceType: cdSt.drafted ? 'manual' : c.provider, sourceUrl: '', viaApp: !cdSt.drafted, model: cdSt.drafted ? undefined : modelName(), createdAt: now, updatedAt: now }]);
+  refresh(); toast('辞書に残しました（手順）'); closeSheet('shCode'); openEntry(e.id);
+}
+function openCode() {
+  $('cdRules').value = cdRules(); cdDrawLang(); if (!cdSt.cands.length) $('cdCand').innerHTML = ''; $('cdMeta').textContent = ''; openSheet('shCode');
+}
+function cdDrawLang() { $('cdLang').innerHTML = CD_LANGS.map(([k, t]) => '<button class="fchip' + (cdSt.lang === k ? ' on' : '') + '" data-cdl="' + k + '">' + t + '</button>').join(''); }
 
 /* ───────── 書庫（タグで自動的に棚を作る。AIは使わない） ───────── */
 let libMode = 'sec', libFilter = '';
