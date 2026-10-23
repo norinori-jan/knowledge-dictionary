@@ -34,6 +34,11 @@ a{color:var(--accent)}
 .search .mag{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:17px;pointer-events:none}
 .search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:18px;min-width:40px;min-height:40px;color:var(--sub);display:none}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pk-code{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;margin:4px 0}
+.pk-part{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}.pk-part b{flex:0 0 36%;word-break:break-all}
+.pk-bar{margin:8px 0;padding:10px 12px;border:1px dashed var(--line);border-radius:12px;font-size:14px;color:var(--sub);cursor:pointer}
+.pk-hit{padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}.pk-hit:last-child{border-bottom:0}
+.pk-b{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:6px;padding:0 5px;margin-right:4px;color:var(--sub)}
 .fchip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:14px;min-height:36px}
 .fchip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .count{font-size:13px;color:var(--sub);margin:10px 2px 2px}
@@ -173,8 +178,10 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
     </div>
   </div>
   <div id="warnBox"></div>
+  <div id="packBar"></div>
   <div class="count" id="count"></div>
   <div id="list"></div>
+  <div id="packBox"></div>
 </div>
 
 <div class="bar"><div class="bar-in row"><button class="btn pri" id="btnAsk" style="flex:1.3">🤖 AIに聞く</button><button class="btn" id="btnAdd" style="flex:1">＋ Q&amp;Aを足す</button></div></div>
@@ -346,6 +353,24 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
   </div>
 </div>
 
+<div class="sheet" id="shPack">
+  <div class="sh-head"><button id="pxClose">閉じる</button><h2>📦 辞書パック</h2><button id="pkStudy">🎓 復習</button></div>
+  <div class="sh-body">
+    <div id="pkMain">
+      <input id="pxQ" placeholder="🔎 コマンド・書き方・用語（例：splice、配列 追加）" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <div class="chips" id="pkLang"></div>
+      <div class="chips" id="pkFlag"></div>
+      <div class="count" id="pkCount"></div>
+      <div id="pxList"></div>
+    </div>
+    <div id="pkStudyBox" style="display:none"></div>
+  </div>
+</div>
+<div class="sheet" id="shPackEntry">
+  <div class="sh-head"><button id="pdClose">閉じる</button><h2>パックの項目</h2><button id="pdBack" style="visibility:hidden">← 戻る</button></div>
+  <div class="sh-body" id="pdBody"></div>
+</div>
+
 <div class="sheet" id="shSet">
   <div class="sh-head"><button id="stClose">閉じる</button><h2>設定・バックアップ</h2><span style="min-width:56px"></span></div>
   <div class="sh-body">
@@ -394,6 +419,16 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
       <div class="note">クラウドには、暗号化したデータだけを送ります（AES-256-GCM／PBKDF2 60万回）。パスフレーズはクラウドに送りません。<b>忘れると、クラウドのデータは誰にも開けません</b>（この端末の中のデータは残ります）。鍵はこの端末に保存するので、同期のたびの入力は要りません。2台目の端末では「🔑 同じパスフレーズを入れる」を使います。</div>
     </div>
     <div class="box">
+      <div class="lab">📦 辞書パック（AIなしで引ける参考辞書）</div>
+      <div id="pkStat" style="font-size:15px"></div>
+      <div class="row" style="margin-top:10px;flex-wrap:wrap">
+        <button class="btn" id="btnPackImport">📦 パックを読み込む</button>
+        <button class="btn" id="btnPackOpen">🔎 開く</button>
+        <button class="btn" id="btnPackClear">🗑 消す</button>
+      </div>
+      <div class="note">PC で作った <b>dict-pack.json</b> を選びます（iPhone は「ファイル」アプリから）。コード・コマンド・用語の参考辞書で、<b>AI もトークンも使わず</b>端末の中で引けます。同じファイルを選び直すと、新しい項目だけ入れ替わります。パックは<b>同期されません</b>（端末ごとに読み込みます）。自分のQ&amp;Aとは別に保管され、書き出しにも入りません。</div>
+    </div>
+    <div class="box">
       <div class="lab">quick-ref から取り込む</div>
       <button class="btn wide" id="btnQRCloud">☁️ quick-ref から取り込む（クラウド経由・おすすめ）</button>
       <label style="display:flex;gap:10px;align-items:center;margin:8px 0"><input type="checkbox" id="sQrAuto"><span>起動時に、新しいAI Q&amp;Aを自動で取り込む</span></label>
@@ -426,12 +461,13 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
 </div>
 
 <input type="file" id="fileOwn" accept="application/json,.json" class="hidden">
+<input type="file" id="filePack" accept="application/json,.json" class="hidden">
 <input type="file" id="fileQR" accept="application/json,.json" class="hidden">
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 'use strict';
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.11.0';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escBr = s => esc(s).replace(/\n/g, '<br>');
@@ -466,11 +502,12 @@ let db = null, memOnly = false;
 function openDB() {
   return new Promise((res, rej) => {
     if (!window.indexedDB) return rej(new Error('IndexedDBが使えません'));
-    const r = indexedDB.open('knowledge-dictionary', 1);
+    const r = indexedDB.open('knowledge-dictionary', 2);
     r.onupgradeneeded = () => {
       const d = r.result;
-      d.createObjectStore('entries', { keyPath: 'id' });
-      d.createObjectStore('qas', { keyPath: 'id' }).createIndex('entryId', 'entryId');
+      if (!d.objectStoreNames.contains('entries')) d.createObjectStore('entries', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('qas')) d.createObjectStore('qas', { keyPath: 'id' }).createIndex('entryId', 'entryId');
+      if (!d.objectStoreNames.contains('pack')) d.createObjectStore('pack', { keyPath: 'id' });   // 辞書パック（参照用。同期しない）
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error || new Error('開けません'));
@@ -484,6 +521,7 @@ const idbPutMany = (store, list) => new Promise((res, rej) => {
   list.forEach(x => s.put(x));
   t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
 });
+const idbClear = store => new Promise((res, rej) => { if (!db) return res(); const t = db.transaction(store, 'readwrite'); t.objectStore(store).clear(); t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
 const idbDel = (store, ids) => new Promise((res, rej) => {
   if (!db || !ids.length) return res();
   const t = db.transaction(store, 'readwrite'), s = t.objectStore(store);
@@ -624,7 +662,8 @@ function snippetFor(e, toks) {
 
 /* ───────── 一覧 ───────── */
 let listView = lsGet('kd_view') === 'concl' ? 'concl' : 'card';
-function renderList() {
+function renderList() { renderList0(); renderPackBlock(); }
+function renderList0() {
   const toks = tokensOf(searchQuery);
   const list = searchEntries(searchQuery, filterUnd, filterKind);
   $('btnClear').style.display = searchQuery ? 'block' : 'none';
@@ -695,6 +734,7 @@ function openEntry(id) {
   if ((e.tags || []).length) h += '<div style="margin:8px 0">' + e.tags.map(t => '<button class="tagbtn" data-search="' + esc(t) + '">#' + esc(t) + '</button>').join('') + '</div>';
   if ((e.related || []).length) h += '<div class="sec-h">関連用語</div><div>' + e.related.map(t => '<button class="tagbtn' + (findEntryByTerm(t) ? ' has' : '') + '" data-rel="' + esc(t) + '">' + (findEntryByTerm(t) ? '📖 ' : '') + esc(t) + '</button>').join('') + '</div><div class="note">📖 付きは、辞書に項目があります。</div>';
   if (e.note) h += '<div class="box" style="border-color:var(--accent)"><div class="lab">自分の理解</div><div>' + rich(e.note) + '</div></div>';
+  h += packRelHtml(e);
   h += '<div class="sec-h" style="margin-top:18px">Q&amp;A（' + qs.length + '件）</div>';
   h += qs.map((q, i) => {
     return '<details class="qa"' + (qs.length === 1 ? ' open' : '') + '><summary>' + esc(firstLine(q.question).slice(0, 80) || '(無題)') + '<div class="qa-meta">' + esc(SRC[q.sourceType] || 'その他') + ' · ' + dstr(q.createdAt) + (q.viaApp ? ' · アプリから質問' : '') + '</div></summary><div class="qa-body">' +
@@ -1250,6 +1290,7 @@ async function renderSettings() {
   const lastS = Number(lsGet('kd_last_sync')) || 0;
   $('syncStat').innerHTML = syncReady() ? (lsGet('kd_sync') === '1' ? '自動同期：オン' : '自動同期：オフ（「今すぐ同期」で開始）') + '<br><span class="note" style="white-space:pre-line">' + esc(syncMsg || (lastS ? '最終同期 ' + dstr(lastS) : 'まだ同期していません')) + '</span><br><span class="note">接続先：' + esc(connDesc()) + '</span>' : '<span class="note">未設定：下の「AIの接続」にエンドポイントとトークンを入れてください</span>';
   $('encStat').innerHTML = syncEncOn() ? '🔒 <b>オン</b>：クラウドには暗号化したデータだけを送ります（鍵はこの端末に保存）' : '🔓 <b>オフ</b>：クラウドの同期データは暗号化されていません';
+  $('pkStat').innerHTML = pkStatHtml();
   const c = aiConfig();
   $('sEndpoint').value = lsGet('kd_endpoint'); $('sToken').value = ''; $('sProvider').value = c.provider; $('sModel').value = lsGet('kd_model');
   $('sQrAuto').checked = lsGet('kd_qrauto') === '1'; $('sAutoOrg').checked = lsGet('kd_autoorg') === '1'; $('sLimit').value = lsGet('kd_limit'); $('sSys').value = lsGet('kd_sys'); $('usageStat').textContent = usageLine();
@@ -1526,6 +1567,35 @@ function wire() {
   });
   $('stClose').addEventListener('click', () => closeSheet('shSet'));
   $('btnExport').addEventListener('click', () => { void exportData(); });
+  $('btnPackImport').addEventListener('click', () => $('filePack').click());
+  $('filePack').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) await importPack(f); });
+  $('btnPackOpen').addEventListener('click', () => openPack(''));
+  $('btnPackClear').addEventListener('click', () => { void pkClear(); });
+  $('pxClose').addEventListener('click', () => { closeSheet('shPack'); });
+  $('pxQ').addEventListener('input', () => { pkSt.q = $('pxQ').value; pkSt.limit = 60; pkRender(); });
+  $('pkStudy').addEventListener('click', () => { if ($('pkStudy').dataset.m === 'study') { pkMode('find'); pkRender(); } else { pkS = { id: '', shown: false, done: 0, skip: new Set(), rand: false }; pkMode('study'); pkStudyDraw(); } });
+  $('shPack').addEventListener('click', ev => {
+    const lg = ev.target.closest('[data-lg]'); if (lg) { pkSt.lang = lg.dataset.lg; pkSt.limit = 60; pkRender(); return; }
+    const fl = ev.target.closest('[data-fl]'); if (fl) { pkSt.flag = fl.dataset.fl; pkSt.limit = 60; pkRender(); return; }
+    if (ev.target.closest('[data-pkmore]')) { pkSt.limit += 60; pkRender(); return; }
+    if (ev.target.closest('#pkEmptyImport')) { $('filePack').click(); return; }
+    const st = ev.target.closest('[data-pkst]'); if (st) { const k = st.dataset.pkst; if (k === 'show') pkStudyShow(); else if (k === 'rand') { pkS.rand = true; pkStudyDraw(); } else pkStudyAnswer(k); }
+  });
+  $('pdClose').addEventListener('click', () => { pkHist = []; closeSheet('shPackEntry'); });
+  $('pdBack').addEventListener('click', () => { pkHist.pop(); const id = pkHist[pkHist.length - 1]; if (id) openPackEntry(id, true); else closeSheet('shPackEntry'); });
+  $('pdBody').addEventListener('click', async ev => {
+    const id = $('pdBody').dataset.id, e = packById.get(id);
+    const o = ev.target.closest('[data-open]'); if (o) { openEntry(o.dataset.open); return; }
+    const tg = ev.target.closest('[data-pktag]'); if (tg) { pkHist = []; closeSheet('shPackEntry'); pkSt = { q: tg.dataset.pktag, lang: '', flag: '', limit: 60 }; $('pkQ').value = pkSt.q; pkMode('find'); pkRender(); openSheet('shPack'); return; }
+    const cp = ev.target.closest('[data-pkcopy]'); if (cp && e) { await copyText(pkText(e, cp.dataset.pkcopy), 'コピーしました'); return; }
+    if (ev.target.closest('[data-pkstar]') && e) { const st = pkStars(); if (st.has(id)) st.delete(id); else st.add(id); pkStarSave(st); openPackEntry(id, true); renderPackBlock(); toast(st.has(id) ? '復習に入れました（今日から出ます）' : '復習から外しました'); return; }
+    if (ev.target.closest('[data-pkadopt]')) { await pkAdopt(id); }
+  });
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-pk]'); if (b && !$('shPackEntry').contains(b)) { openPackEntry(b.dataset.pk); return; }
+    if (b && $('shPackEntry').contains(b)) { openPackEntry(b.dataset.pk); return; }
+    const o = ev.target.closest('[data-pkopen]'); if (o) openPack(o.dataset.pkq || '');
+  });
   $('btnExportEnc').addEventListener('click', async () => {
     const a = $('sBkPass').value, b = $('sBkPass2').value;
     if (a.length < 10) { toast('パスフレーズは10文字以上にしてください'); return; }
@@ -1794,6 +1864,235 @@ async function digestBatch() {
   digestBusy = false; $('sysCand').innerHTML = ''; refresh(); drawSysSteps(); drawSysTree(); toast(done + '項目をまとめました' + (bad ? '（' + bad + '回は失敗）' : ''));
 }
 
+/* ───────── 辞書パック（dict-pack.json。参照用・AIなし） ───────── */
+const PK_LANG = { js: 'JavaScript', ps: 'PowerShell', html: 'HTML', css: 'CSS', py: 'Python', sql: 'SQL', sh: 'シェル', git: 'git', gh: 'GitHub', cf: 'Cloudflare', win: 'Windows', ai: 'AI', phys: '物理', cul: '文化', gen: '一般', mine: '自分の使い方' };
+const PK_KIND = { syntax: '文法', command: 'コマンド', api: '部品・関数', error: 'エラー', concept: '考え方', mined: '自分のメモ' };
+let pack = [], packById = new Map();
+const pkIdx = new Map(), pkFld = new Map();
+const pkStr = (v, n) => (typeof v === 'string' ? v.slice(0, n || 4000) : '');
+const pkLangName = l => PK_LANG[l] || l;
+const pkHead = e => e.term.split(/[（(]/)[0].trim() || e.term;
+function pkValid(x) { return !!(x && typeof x === 'object' && pkStr(x.id, 200) && pkStr(x.term, 300) && pkStr(x.lang, 20) && pkStr(x.kind, 20) && pkStr(x.summary, 1000)); }
+function pkClean(x) {
+  const arr = v => (Array.isArray(v) ? v : []);
+  return {
+    id: pkStr(x.id, 200), term: pkStr(x.term, 300), lang: pkStr(x.lang, 20), kind: pkStr(x.kind, 20), summary: pkStr(x.summary, 1000), form: pkStr(x.form), example: pkStr(x.example),
+    parts: arr(x.parts).filter(q => Array.isArray(q) && q.length >= 2).slice(0, 30).map(q => [pkStr(String(q[0]), 200), pkStr(String(q[1]), 500)]),
+    mistakes: arr(x.mistakes).slice(0, 20).map(m => pkStr(String(m), 500)), related: arr(x.related).slice(0, 30).map(m => pkStr(String(m), 200)), tags: arr(x.tags).slice(0, 20).map(m => pkStr(String(m), 40)),
+    sources: arr(x.sources).filter(q => q && typeof q === 'object').slice(0, 10).map(q => ({ id: pkStr(String(q.id || ''), 100), title: pkStr(String(q.title || ''), 200) })),
+    confidence: x.confidence === 'low' ? 'low' : 'high', verified: x.verified === true, updatedAt: Number(x.updatedAt) || 0
+  };
+}
+function pkRebuild() { packById = new Map(pack.map(e => [e.id, e])); pkIdx.clear(); pkFld.clear(); }
+function pkIdxOf(e) {
+  let x = pkIdx.get(e.id); if (x) return x;
+  x = { term: norm(e.term), head: norm(pkHead(e)), name: norm(e.id.slice(e.id.indexOf(':') + 1)), lang: norm(e.lang) + ' ' + norm(pkLangName(e.lang)), tags: (e.tags || []).map(norm), sum: norm(e.summary), form: norm(e.form), pn: norm((e.parts || []).map(q => q[0]).join(' ')), pd: norm((e.parts || []).map(q => q[1]).join(' ')), mist: norm((e.mistakes || []).join(' ')), ex: norm(e.example) };
+  pkIdx.set(e.id, x); return x;
+}
+function pkFields(e) {
+  let c = pkFld.get(e.id); if (c) return c;
+  c = [[bigramsOf(e.term + ' ' + (e.tags || []).join(' ')), 3], [bigramsOf(e.summary), 2], [bigramsOf((e.parts || []).map(q => q.join(' ')).join(' ')), 1]];
+  pkFld.set(e.id, c); return c;
+}
+function pkScoreTok(x, q) {
+  if (x.head === q || x.term === q) return 100;
+  if (x.name === q) return 95;
+  if (x.tags.includes(q)) return 80;
+  if (x.head.includes(q)) return 55;
+  if (x.name.includes(q)) return 50;
+  if (x.lang.split(' ').includes(q)) return 25;
+  if (x.tags.some(t => t.includes(q))) return 30;
+  if (x.term.includes(q)) return 28;
+  if (x.sum.includes(q)) return 20;
+  if (x.pn.includes(q)) return 18;
+  if (x.form.includes(q)) return 12;
+  if (x.pd.includes(q)) return 8;
+  if (x.mist.includes(q)) return 6;
+  if (x.ex.includes(q)) return 5;
+  return 0;
+}
+const pkVol = e => (e.tags || []).includes('変わりやすい');
+const pkStars = () => { try { return new Set(JSON.parse(lsGet('kd_pkstar') || '[]')); } catch (_) { return new Set(); } };
+const pkStarSave = st => lsSet('kd_pkstar', JSON.stringify([...st]));
+function pkFlagOk(e, f) {
+  if (!f) return true;
+  if (f === 'ver') return e.verified; if (f === 'low') return e.confidence === 'low' || (!e.verified && ['ps', 'win', 'sh', 'git', 'gh', 'cf'].includes(e.lang) && e.kind !== 'concept');
+  if (f === 'vol') return pkVol(e); if (f === 'star') return pkStars().has(e.id);
+  return true;
+}
+// 引く：空白区切りの語をすべて含むものを上に。少ないときは、一部だけ当たるものも足す（ゆるく一致）
+function packSearch(query, o) {
+  o = o || {}; const toks = tokensOf(query), cmp = (a, b) => (b.e.verified - a.e.verified) || a.e.term.localeCompare(b.e.term, 'ja');
+  const base = pack.filter(e => (!o.lang || e.lang === o.lang) && pkFlagOk(e, o.flag));
+  if (!toks.length) return base.slice().sort((a, b) => a.lang.localeCompare(b.lang) || a.term.localeCompare(b.term, 'ja'));
+  const strict = [], loose = [];
+  for (const e of base) {
+    const x = pkIdxOf(e); let tot = 0, hit = 0;
+    for (const q of toks) { const sc = pkScoreTok(x, q); if (sc) { tot += sc; hit++; } }
+    if (!hit || tot < (o.min || 0)) continue;
+    (hit === toks.length ? strict : loose).push({ e, s: tot });
+  }
+  const by = (a, b) => (b.s - a.s) || cmp(a, b);
+  strict.sort(by); loose.sort(by);
+  const out = (strict.length >= 3 || o.min ? strict : strict.concat(loose)).map(x => x.e);
+  out.looseFrom = strict.length >= 3 || o.min ? out.length : strict.length;
+  return out;
+}
+// 文章（質問）から、関係しそうな項目を探す（AIに材料として渡す用）
+function packRetrieve(query, k) {
+  if (!pack.length) return [];
+  const qn = norm(query), qb = bigramsOf(query), sc = [];
+  for (const e of pack) {
+    const x = pkIdxOf(e); let s = 0;
+    if (x.head.length >= 2 && qn.includes(x.head)) s += 20;
+    if (x.name.length >= 3 && qn.includes(x.name)) s += 20;
+    x.tags.forEach(t => { if (t.length >= 2 && qn.includes(t)) s += 5; });
+    if (qb.size) for (const [bs, w] of pkFields(e)) { let h = 0; qb.forEach(g => { if (bs.has(g)) h++; }); s += w * (h / qb.size) * 10; }
+    if (s >= 6) sc.push({ e, s: s + (e.verified ? 1 : 0) });
+  }
+  return sc.sort((a, b) => b.s - a.s).slice(0, k || 4).map(x => x.e);
+}
+const packMaterial = e => ('■[パック：' + e.term + ']（' + pkLangName(e.lang) + '）\n' + e.summary + (e.form ? '\n形：' + e.form.slice(0, 300) : '') + (e.mistakes.length ? '\nよくある間違い：' + e.mistakes.slice(0, 3).join('／') : '')).slice(0, 800);
+function pkBadges(e) {
+  return '<span class="pk-b">' + esc(pkLangName(e.lang)) + '</span><span class="pk-b">' + esc(PK_KIND[e.kind] || e.kind) + '</span>' + (e.verified ? '<span class="pk-b" style="color:var(--knw)">✅確認済み</span>' : '') + (e.confidence === 'low' ? '<span class="pk-b" style="color:var(--unk)">⚠要確認</span>' : '') + (pkVol(e) ? '<span class="pk-b" style="color:var(--lrn)">⏳変わりやすい</span>' : '') + (pkStars().has(e.id) ? '<span class="pk-b">⭐</span>' : '');
+}
+function pkMeta() { try { return JSON.parse(lsGet('kd_pack_meta') || '{}') || {}; } catch (_) { return {}; } }
+async function importPack(file) {
+  let o; try { o = JSON.parse(await file.text()); } catch (_) { toast('JSONとして読めませんでした'); return; }
+  const list = o && o.app === 'dict-pack' && Array.isArray(o.entries) ? o.entries : null;
+  if (!list) { toast('辞書パック（dict-pack.json）ではありません'); return; }
+  let add = 0, upd = 0, same = 0, bad = 0; const put = [];
+  for (const x of list) {
+    if (!pkValid(x)) { bad++; continue; }
+    const c = pkClean(x), cur = packById.get(c.id);
+    if (!cur) { put.push(c); add++; }
+    else if (c.updatedAt >= cur.updatedAt && JSON.stringify(c) !== JSON.stringify(cur)) { put.push(c); upd++; }
+    else same++;
+  }
+  if (put.length) {
+    const m = new Map(pack.map(e => [e.id, e])); put.forEach(c => m.set(c.id, c)); pack = [...m.values()];
+    pkRebuild(); try { await idbPutMany('pack', put); } catch (_) { toast('保存できませんでした（この画面を閉じると消えます）'); }
+  }
+  lsSet('kd_pack_meta', JSON.stringify({ builtAt: Number(o.builtAt) || 0, loadedAt: Date.now() }));
+  renderSettings(); renderList(); pkRender();
+  toast('パックを読み込みました：新規 ' + add + '・更新 ' + upd + '・変更なし ' + same + (bad ? '・読めない ' + bad : ''));
+}
+async function pkClear() {
+  if (!pack.length) { toast('パックは入っていません'); return; }
+  if (!confirm('辞書パック ' + pack.length + '件を、この端末から消します。自分の項目やQ&Aは消えません。（パックのファイルがあれば、また読み込めます）')) return;
+  pack = []; pkRebuild(); try { await idbClear('pack'); } catch (_) {}
+  lsSet('kd_pack_meta', '{}'); renderSettings(); renderList(); pkRender(); toast('パックを消しました');
+}
+function pkStatHtml() {
+  if (!pack.length) return '<span class="note">まだ入っていません。「パックを読み込む」で dict-pack.json を選んでください。</span>';
+  const ver = pack.filter(e => e.verified).length, low = pack.filter(e => e.confidence === 'low').length, m = pkMeta(), langs = {};
+  pack.forEach(e => { langs[e.lang] = (langs[e.lang] || 0) + 1; });
+  return '<b>' + pack.length + '</b>件（✅確認済み ' + ver + '・⚠要確認 ' + low + '）<br><span class="note">' + Object.keys(langs).sort().map(l => esc(pkLangName(l)) + ' ' + langs[l]).join('・') + (m.builtAt ? '<br>パックの作成：' + dstr(m.builtAt) : '') + (m.loadedAt ? '　読み込み：' + dstr(m.loadedAt) : '') + '</span>';
+}
+
+/* 引く画面 */
+let pkSt = { q: '', lang: '', flag: '', limit: 60 };
+function openPack(q) { pkSt = { q: q || '', lang: '', flag: '', limit: 60 }; $('pxQ').value = pkSt.q; pkMode('find'); pkRender(); openSheet('shPack'); }
+function pkMode(m) { $('pkMain').style.display = m === 'find' ? '' : 'none'; $('pkStudyBox').style.display = m === 'study' ? '' : 'none'; $('pkStudy').textContent = m === 'study' ? '🔎 引く' : '🎓 復習'; $('pkStudy').dataset.m = m; }
+function pkRender() {
+  if (!$('pxList')) return;
+  if (!pack.length) { $('pkCount').textContent = ''; $('pkLang').innerHTML = ''; $('pkFlag').innerHTML = ''; $('pxList').innerHTML = '<div class="empty"><div style="font-size:40px">📦</div><div style="font-weight:700;margin-top:6px">辞書パックはまだ入っていません</div><div class="note" style="margin-top:6px">PC で作った dict-pack.json を読み込むと、コード・コマンド・用語を、AIを使わずに引けます。</div><div class="btns"><button class="btn pri" id="pkEmptyImport">📦 パックを読み込む</button></div></div>'; return; }
+  const cnt = {}; pack.forEach(e => { cnt[e.lang] = (cnt[e.lang] || 0) + 1; });
+  $('pkLang').innerHTML = '<button class="fchip' + (pkSt.lang ? '' : ' on') + '" data-lg="">全部 ' + pack.length + '</button>' + Object.keys(cnt).sort().map(l => '<button class="fchip' + (pkSt.lang === l ? ' on' : '') + '" data-lg="' + esc(l) + '">' + esc(pkLangName(l)) + ' ' + cnt[l] + '</button>').join('');
+  const FL = [['', 'すべて'], ['ver', '✅確認済み'], ['low', '⚠要確認'], ['vol', '⏳変わりやすい'], ['star', '⭐覚えたい']];
+  $('pkFlag').innerHTML = FL.map(([k, t]) => '<button class="fchip' + (pkSt.flag === k ? ' on' : '') + '" data-fl="' + k + '">' + t + '</button>').join('');
+  const list = packSearch(pkSt.q, { lang: pkSt.lang, flag: pkSt.flag }), toks = tokensOf(pkSt.q), more = list.length > pkSt.limit, lf = list.looseFrom;
+  $('pkCount').textContent = toks.length || pkSt.lang || pkSt.flag ? list.length + '件' + (typeof lf === 'number' && lf < list.length && toks.length ? '（うち ' + (list.length - lf) + '件は、語の一部だけ一致）' : '') : '全' + pack.length + '件';
+  if (!list.length) { $('pxList').innerHTML = '<div class="empty">見つかりませんでした。<br><span style="font-size:13px">語を減らすか、別の言い方・英語名で試してください。</span></div>'; return; }
+  $('pxList').innerHTML = list.slice(0, pkSt.limit).map((e, i) => '<div class="card" data-pk="' + esc(e.id) + '"><div class="c-top"><span class="c-term">' + hl(e.term, toks) + '</span></div><div style="margin:2px 0">' + pkBadges(e) + '</div><div class="c-one">' + hl(e.summary, toks) + '</div></div>').join('') + (more ? '<button class="btn wide" data-pkmore="1" style="margin-top:8px">もっと見る（残り ' + (list.length - pkSt.limit) + '件）</button>' : '');
+}
+
+/* 項目の画面 */
+let pkHist = [];
+function openPackEntry(id, back) {
+  const e = packById.get(id); if (!e) { toast('この項目はパックにありません'); return; }
+  if (!back && pkHist[pkHist.length - 1] !== id) pkHist.push(id);
+  $('pdBack').style.visibility = pkHist.length > 1 ? 'visible' : 'hidden';
+  const star = pkStars().has(id), code = t => '<pre class="pk-code">' + esc(t) + '</pre>';
+  let h = '<div class="v-term">' + esc(e.term) + '</div><div style="margin:4px 0">' + pkBadges(e) + '</div><div style="font-size:17px;margin-top:6px">' + esc(e.summary) + '</div>';
+  if (e.confidence === 'low') h += '<div class="banner">⚠ 確信が低い項目です。使う前に、公式の資料や実行で確かめてください。</div>';
+  if (pkVol(e)) h += '<div class="banner">⏳ 変わりやすい情報です（バージョン・仕様・名前など）。最新を確かめてください。</div>';
+  if (e.form) h += '<div class="sec-h">形</div>' + code(e.form) + '<button class="btn sm" data-pkcopy="form">📋 形をコピー</button>';
+  if (e.parts.length) h += '<div class="sec-h">部品の意味</div>' + e.parts.map(q => '<div class="pk-part"><b>' + esc(q[0]) + '</b><span>' + esc(q[1]) + '</span></div>').join('');
+  if (e.example) h += '<div class="sec-h">例</div>' + code(e.example) + '<button class="btn sm" data-pkcopy="example">📋 例をコピー</button>';
+  if (e.mistakes.length) h += '<div class="sec-h">よくある間違い</div><ul class="op">' + e.mistakes.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>';
+  if (e.related.length) h += '<div class="sec-h">関連</div><div>' + e.related.map(r => packById.has(r) ? '<button class="tagbtn has" data-pk="' + esc(r) + '">📦 ' + esc(packById.get(r).term.split(/[（(]/)[0]) + '</button>' : '<span class="tagbtn" style="opacity:.55">' + esc(r.slice(r.indexOf(':') + 1)) + '</span>').join('') + '</div>';
+  if (e.tags.length) h += '<div style="margin:8px 0">' + e.tags.map(t => '<button class="tagbtn" data-pktag="' + esc(t) + '">#' + esc(t) + '</button>').join('') + '</div>';
+  if (e.sources.length) h += '<div class="note">元になった自分のメモ：' + e.sources.map(q => esc(q.title || q.id)).join('、') + '</div>';
+  const mine = searchEntries(pkHead(e), 'all', 'all').slice(0, 3);
+  if (mine.length) h += '<div class="sec-h">📖 自分の辞書にもあります</div><div>' + mine.map(m => '<button class="tagbtn has" data-open="' + esc(m.id) + '">📖 ' + esc(m.term) + '</button>').join('') + '</div>';
+  h += '<div style="margin-top:14px;display:grid;gap:8px"><button class="btn wide" data-pkstar="1">' + (star ? '⭐ 覚えたいを外す' : '☆ 覚えたい（復習に入れる）') + '</button><button class="btn wide" data-pkadopt="1">📌 自分の辞書に取り込む</button><button class="btn wide" data-pkcopy="ai">📋 AIに渡す用にコピー</button></div>';
+  h += '<div class="note" style="margin-top:8px">✅は、例を実行（または構文を検査）して確かめた印です。それ以外も、公式の資料と食い違うことがあります。</div>';
+  $('pdBody').innerHTML = h; $('pdBody').dataset.id = id; openSheet('shPackEntry');
+}
+function pkText(e, what) {
+  if (what === 'form') return e.form; if (what === 'example') return e.example;
+  return '【辞書パック】' + e.term + '（' + pkLangName(e.lang) + '）\n' + e.summary + (e.form ? '\n\n形：\n' + e.form : '') + (e.example ? '\n\n例：\n' + e.example : '') + (e.mistakes.length ? '\n\nよくある間違い：\n' + e.mistakes.map(m => '・' + m).join('\n') : '');
+}
+async function pkAdopt(id) {
+  const e = packById.get(id); if (!e) return;
+  const head = pkHead(e).slice(0, 60), now = Date.now(), kind = ['syntax', 'command', 'api', 'error'].includes(e.kind) ? 'howto' : (e.kind === 'concept' ? 'idea' : 'term');
+  const ans = e.summary + (e.form ? '\n\n【形】\n' + e.form : '') + (e.parts.length ? '\n\n【部品】\n' + e.parts.map(q => '・' + q[0] + '：' + q[1]).join('\n') : '') + (e.example ? '\n\n【例】\n' + e.example : '') + (e.mistakes.length ? '\n\n【よくある間違い】\n' + e.mistakes.map(m => '・' + m).join('\n') : '');
+  let en = findEntryByTerm(head);
+  if (en && (qasByEntry.get(en.id) || []).some(q => q.fromPack === e.id)) { toast('すでに取り込んでいます'); openEntry(en.id); return; }
+  if (en) en = Object.assign({}, en, { oneLine: en.oneLine || e.summary.slice(0, 100), tags: union(en.tags, e.tags), updatedAt: now });
+  else en = { id: uid(), term: head, kind, oneLine: e.summary.slice(0, 100), tags: e.tags.slice(0, 6), related: [], note: '', understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
+  await writeEntries([en]);
+  await writeQAs([{ id: uid(), entryId: en.id, question: head + ' とは？（辞書パックより）', answer: ans, judgment: '', sourceType: 'other', sourceUrl: '', fromPack: e.id, createdAt: now, updatedAt: now }]);
+  refresh(); toast('自分の辞書に取り込みました'); closeSheet('shPackEntry'); openEntry(en.id);
+}
+function packRelHtml(e) {
+  if (!pack.length) return '';
+  const seen = new Set(), out = [];
+  for (const t of [e.term].concat(e.aliases || [])) { for (const x of packSearch(t, { min: 50 }).slice(0, 3)) if (!seen.has(x.id)) { seen.add(x.id); out.push(x); } }
+  if (!out.length) return '';
+  return '<div class="sec-h">📦 辞書パックにも載っています</div><div>' + out.slice(0, 4).map(x => '<button class="tagbtn has" data-pk="' + esc(x.id) + '">📦 ' + esc(pkHead(x)) + '</button>').join('') + '</div>';
+}
+
+/* 一覧に出すパックの案内と検索結果 */
+function renderPackBlock() {
+  const bar = $('packBar'), box = $('packBox'); if (!bar || !box) return;
+  if (!pack.length) { bar.innerHTML = ''; box.innerHTML = ''; return; }
+  const due = pkDueIds().length;
+  bar.innerHTML = searchQuery ? '' : '<div class="pk-bar" data-pkopen="1">📦 辞書パック <b>' + pack.length + '</b>件（AIなしで引く）' + (due ? '　🎓 復習 ' + due + '枚' : '') + ' ›</div>';
+  if (!searchQuery.trim()) { box.innerHTML = ''; return; }
+  const hits = packSearch(searchQuery, {}); if (!hits.length) { box.innerHTML = ''; return; }
+  const toks = tokensOf(searchQuery);
+  box.innerHTML = '<div class="sec-h">📦 辞書パックでも見つかりました（' + hits.length + '件）</div><div class="box" style="padding:4px 12px">' + hits.slice(0, 4).map(e => '<div class="pk-hit" data-pk="' + esc(e.id) + '"><b>' + hl(e.term, toks) + '</b> ' + pkBadges(e) + '<div class="note">' + hl(e.summary, toks) + '</div></div>').join('') + '</div>' + (hits.length > 4 ? '<button class="btn wide" data-pkopen="1" data-pkq="' + esc(searchQuery) + '">パックで ' + hits.length + '件すべて見る</button>' : '');
+}
+
+/* 復習（⭐を付けた項目を、間をあけて出す） */
+const pkProg = () => { try { return JSON.parse(lsGet('kd_pk') || '{}') || {}; } catch (_) { return {}; } };
+function pkDueIds() { const pr = pkProg(), now = Date.now(); return [...pkStars()].filter(id => packById.has(id) && (!pr[id] || pr[id].n <= now)).sort((a, b) => ((pr[a] || {}).n || 0) - ((pr[b] || {}).n || 0)); }
+let pkS = { id: '', shown: false, done: 0, skip: new Set(), rand: false };
+function pkStudyDraw() {
+  const box = $('pkStudyBox'); let e = null;
+  if (pkS.rand) { const pool = pack.filter(x => (!pkSt.lang || x.lang === pkSt.lang) && x.id !== pkS.id); e = pool[Math.floor(Math.random() * pool.length)] || null; }
+  else { const ids = pkDueIds().filter(id => !pkS.skip.has(id)); e = ids.length ? packById.get(ids[0]) : null; }
+  if (!e) {
+    box.innerHTML = '<div class="empty"><div style="font-size:40px">' + (pkS.done ? '🎉' : '🎓') + '</div><div style="font-weight:700;margin-top:6px">' + (pkS.done ? '今日の分は終わりました（' + pkS.done + '枚）' : (pkStars().size ? '今日の復習はありません' : '復習に入れた項目がありません')) + '</div><div class="note" style="margin-top:6px">項目の画面で「☆ 覚えたい」を押すと、ここに出ます。間をあけて（1日→3日→7日→14日→30日）くり返します。</div><div class="btns"><button class="btn" data-pkst="rand">🎲 ランダムに1つ</button></div></div>'; return;
+  }
+  pkS.id = e.id; pkS.shown = false;
+  box.innerHTML = '<div class="note">' + (pkS.rand ? 'ランダム' : '残り ' + (pkDueIds().filter(id => !pkS.skip.has(id)).length) + '枚') + '</div><div class="br-card"><div class="v-term">' + esc(e.term) + '</div><div style="margin:4px 0">' + pkBadges(e) + '</div><div class="note">思い出してから「答えを見る」を押してください。（形・使い方・よくある間違い）</div></div><button class="btn pri wide" data-pkst="show">答えを見る</button>';
+}
+function pkStudyShow() {
+  const e = packById.get(pkS.id); if (!e) return; pkS.shown = true;
+  const code = t => '<pre class="pk-code">' + esc(t) + '</pre>';
+  $('pkStudyBox').innerHTML = '<div class="br-card"><div class="v-term">' + esc(e.term) + '</div><div style="margin:4px 0">' + pkBadges(e) + '</div><div style="font-size:17px">' + esc(e.summary) + '</div>' + (e.form ? '<div class="sec-h">形</div>' + code(e.form) : '') + (e.example ? '<div class="sec-h">例</div>' + code(e.example) : '') + (e.mistakes.length ? '<div class="sec-h">よくある間違い</div><ul class="op">' + e.mistakes.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>' : '') + '</div>' +
+    (pkS.rand ? '<div class="row"><button class="btn pri" data-pkst="rand">次のランダム</button><button class="btn" data-pk="' + esc(e.id) + '">詳しく見る</button></div>' : '<div class="und-row"><button class="und-known" data-pkst="ok">😀 分かった</button><button class="und-learning" data-pkst="maybe">🤔 あやしい</button><button class="und-unknown" data-pkst="ng">❌ 忘れた</button></div>');
+}
+function pkStudyAnswer(k) {
+  const pr = pkProg(), id = pkS.id, cur = pr[id] || { s: 0, c: 0 }, now = Date.now();
+  const s = k === 'ok' ? Math.min((cur.s || 0) + 1, 4) : 0, days = k === 'ok' ? [0, 3, 7, 14, 30][s] : (k === 'maybe' ? 1 : 0);
+  pr[id] = { s, c: (cur.c || 0) + 1, n: now + days * 86400000 }; lsSet('kd_pk', JSON.stringify(pr));
+  pkS.skip.add(id); pkS.done++; pkStudyDraw(); renderPackBlock();
+}
+
 /* ───────── 書庫（タグで自動的に棚を作る。AIは使わない） ───────── */
 let libMode = 'sec', libFilter = '';
 function tagIndex() {
@@ -2042,7 +2341,7 @@ function openBrain() { brainMeta(); drawGaps(); openSheet('shBrain'); }
 async function brainAsk() {
   if (brainBusy) return;
   const q = $('bQ').value.trim(); if (!q) { toast('質問を入れてください'); return; }
-  if (!entries.length) { $('bOut').innerHTML = '<div class="banner">辞書がまだ空です。先にQ&amp;Aを足してください。</div>'; return; }
+  if (!entries.length && !pack.length) { $('bOut').innerHTML = '<div class="banner">辞書がまだ空です。先にQ&amp;Aを足してください。</div>'; return; }
   let src = retrieve(q, 6), viaExpand = false;
   if (src.length < 3) {   // 材料が少ない：言い換えで探し直す（AIを1回、少量だけ使う）
     brainBusy = true; $('btnBrainAsk').disabled = true; $('btnBrainAsk').textContent = '🧠 言い換えで探しています…';
@@ -2054,9 +2353,11 @@ async function brainAsk() {
     } catch (_) { /* 失敗したら、局所検索の結果だけで続ける */ }
     brainBusy = false; $('btnBrainAsk').disabled = false; $('btnBrainAsk').textContent = '🧠 辞書に聞く';
   }
-  if (!src.length) { $('bOut').innerHTML = '<div class="banner">この質問に関係しそうな項目が、辞書に見つかりませんでした。通常の「🤖AIに聞く」で聞いて、辞書に足せます。（答えはAIに聞いていません）</div>'; return; }
+  const ph = packRetrieve(q, 4);
+  if (!src.length && !ph.length) { $('bOut').innerHTML = '<div class="banner">この質問に関係しそうな項目が、辞書に見つかりませんでした。通常の「🤖AIに聞く」で聞いて、辞書に足せます。（答えはAIに聞いていません）</div>'; return; }
   let mat = ''; for (const e of src) { const m = material(e, 1400); if ((mat + m).length > 7500) break; mat += m + '\n\n'; }
-  const prompt = redact('あなたは、私の個人辞書だけを根拠に答えるアシスタントです。\nルール:\n- 下の【辞書の材料】に書かれていることだけで答える。書かれていないことを推測で足さない\n- 根拠にした項目は、文中で [[見出し語]] の形で示す\n- 「自分の判断」「自分の理解」があれば、AIの回答より優先して示す\n- 材料で足りないときは「辞書には無い」と言い、そのうえで末尾に「（辞書の外・一般知識）」と明記して、短く補足してよい\n- 日本語で、結論から簡潔に\n\n【辞書の材料】\n' + mat + '【質問】\n' + q).text;
+  if (ph.length) mat += '【辞書パックの材料（公開された一般的な知識。自分の項目と食い違うときは、自分の項目を優先する）】\n' + ph.map(packMaterial).join('\n\n') + '\n\n';
+  const prompt = redact('あなたは、私の個人辞書だけを根拠に答えるアシスタントです。\nルール:\n- 下の【辞書の材料】に書かれていることだけで答える。書かれていないことを推測で足さない\n- 根拠にした項目は、文中で [[見出し語]] の形で示す（辞書パックの項目は［パック：見出し語］）\n- 「自分の判断」「自分の理解」があれば、AIの回答より優先して示す\n- 材料で足りないときは「辞書には無い」と言い、そのうえで末尾に「（辞書の外・一般知識）」と明記して、短く補足してよい\n- 日本語で、結論から簡潔に\n\n【辞書の材料】\n' + mat + '【質問】\n' + q).text;
   brainBusy = true; $('btnBrainAsk').disabled = true; $('btnBrainAsk').textContent = '🧠 考え中…（最大90秒）'; $('bOut').innerHTML = '';
   let ans = '', err = '';
   try { ans = (await callAI(prompt, { maxTokens: 1200 })).trim(); if (!ans) err = 'AIの返事が空でした'; } catch (e) { err = (e && e.message) || String(e); }
@@ -2064,7 +2365,7 @@ async function brainAsk() {
   if (err) { $('bOut').innerHTML = '<div class="banner">' + esc(err) + '</div>'; return; }
   brainSrc = src; brainAns = ans; brainQ = q;
   $('bOut').innerHTML = '<div class="br-card"><div class="lab" style="margin-top:0">答え</div><div>' + rich(ans) + '</div></div>' +
-    '<div class="sec-h">根拠として渡した項目（押すと開きます）' + (viaExpand ? '　<span class="kbadge">言い換えで探しました</span>' : '') + '</div><div class="br-src">' + src.map(e => '<button class="tagbtn has" data-open="' + esc(e.id) + '">📖 ' + esc(e.term) + '</button>').join('') + '</div>' +
+    '<div class="sec-h">根拠として渡した項目（押すと開きます）' + (viaExpand ? '　<span class="kbadge">言い換えで探しました</span>' : '') + '</div><div class="br-src">' + src.map(e => '<button class="tagbtn has" data-open="' + esc(e.id) + '">📖 ' + esc(e.term) + '</button>').join('') + ph.map(e => '<button class="tagbtn" data-pk="' + esc(e.id) + '">📦 ' + esc(pkHead(e)) + '</button>').join('') + '</div>' +
     '<div class="row" style="margin-top:8px"><button class="btn" data-br="save">📌 この答えを項目として残す</button><button class="btn" data-br="copy">📋 コピー</button></div>';
 }
 async function brainSave() {
@@ -2248,9 +2549,9 @@ function initChips() {
 async function init() {
   $('ver').textContent = APP_VERSION;
   wire(); initChips();
-  try { db = await openDB(); entries = await idbAll('entries'); qas = await idbAll('qas'); }
+  try { db = await openDB(); entries = await idbAll('entries'); qas = await idbAll('qas'); try { pack = await idbAll('pack'); } catch (_) { pack = []; } }
   catch (e) { memOnly = true; db = null; entries = []; qas = []; }
-  rebuild(); refresh();
+  pkRebuild(); rebuild(); refresh();
   if (lsGet('kd_sync') === '1' && syncReady()) void kdSync(false);
   if (lsGet('kd_qrauto') === '1' && syncReady()) void qrCloudImport(true);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});

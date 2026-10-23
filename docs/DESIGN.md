@@ -172,6 +172,16 @@ flow-mind        関係性            知識どうしのつながり
 - 秘密検出：SECRET_RE（AI送信前の redact と共通）。保存時は質問・回答・自分の判断を検査。〔伏せ字〕済みの行は再検出しない。
 - 既知の限界：端末内は平文。鍵は localStorage（同じ端末の人には読める）。パスフレーズ復旧手段なし。
 
+## 辞書パック（v0.11.0）
+
+- 形式：{app:'dict-pack',version:1,builtAt,entries:[{id,term,lang,kind,summary,form,parts,example,mistakes,related,tags,sources,confidence,verified,updatedAt}]}。必須は id term lang kind summary。型は読み込み時に整える（長さ上限あり）。
+- 保存：IndexedDB v2 の 'pack' ストア（v1→v2は追加のみで、既存データはそのまま）。自分のデータとは分け、同期・書き出しの対象外。
+- 取り込み：id が同じなら updatedAt が新しい方（同時刻は入れ替え）。パックから消えた項目は残る（完全に入れ替えるときは「消す」→読み込み）。
+- 検索：packSearch＝語ごとの得点（見出し・英語名・タグ・説明・部品・形・間違い・例）を AND で足し、少なければ一部一致も追加。packRetrieve＝質問文からの2文字一致（AIへの材料用、上位4件）。
+- AIへの渡し方：自分の項目の後ろに「辞書パックの材料」（要約・形300字・間違い3件）。自分を優先する指示つき。
+- 復習：⭐の項目だけ。進み具合は localStorage（kd_pk、kd_pkstar）。
+- 方針：パックの更新はPC側（knowledge-base）。アプリは読むだけで、パックの中身は書き換えない。
+
 ## 既知の制限
 
 - 同期は最終更新が新しい側が勝つ方式（同じ項目を同時に別々に編集すると、片方の編集が負ける）
