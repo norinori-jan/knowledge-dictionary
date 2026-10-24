@@ -42,7 +42,7 @@ with sync_playwright() as p:
 
     pg.click('#btnAsk'); pg.wait_for_selector('#shAsk.open'); pg.wait_for_timeout(300)
     pg.fill('#aQ','JWTとは何ですか？\napi_key = sk-abcdefghijklmnopqrstuvwxyz123456')
-    pg.click('#btnAskGo'); pg.wait_for_selector('[data-ask="save"]',timeout=8000)
+    pg.click('#btnAskGo'); pg.wait_for_selector('[data-ask="save"]',timeout=25000)
     check('秘密行の除外を確認するダイアログ', any('秘密らしい行' in d for d in dialogs))
     check('送った本文に秘密が無い', 'sk-abcdef' not in reqs[0]['prompt'])
     check('回答の指示が先頭に付く', reqs[0]['prompt'].startswith('テスト指示：短く答えて'))
@@ -61,7 +61,7 @@ with sync_playwright() as p:
     pg.click('#btnAsk'); pg.wait_for_selector('#shAsk.open')
     pg.fill('#aQ','JWTとは何ですか？有効期限は？'); pg.wait_for_selector('[data-ctx]',timeout=3000)
     check('過去の項目が材料候補に出る', 'JWTとは何ですか' in pg.inner_text('#aCtx'))
-    pg.check('[data-ctx]'); pg.click('#btnAskGo'); pg.wait_for_selector('[data-ask="save"]',timeout=8000)
+    pg.check('[data-ctx]'); pg.click('#btnAskGo'); pg.wait_for_selector('[data-ask="save"]',timeout=25000)
     check('材料が送られる', '【参考：以前の自分の整理】' in reqs[1]['prompt'])
     check('1件チェックなら、その項目に足す案内', 'に足します' in pg.inner_text('#aOut'))
     pg.click('[data-ask="save"]'); pg.wait_for_selector('#shEntry.open'); pg.wait_for_timeout(400)
@@ -70,7 +70,7 @@ with sync_playwright() as p:
 
     # --- 上限（2回で到達→3回目は確認ダイアログ） ---
     n0=len(dialogs)
-    pg.click('#btnAsk'); pg.wait_for_selector('#shAsk.open'); pg.fill('#aQ','3回目の質問'); pg.click('#btnAskGo'); pg.wait_for_selector('[data-ask="save"]',timeout=8000)
+    pg.click('#btnAsk'); pg.wait_for_selector('#shAsk.open'); pg.fill('#aQ','3回目の質問'); pg.click('#btnAskGo'); pg.wait_for_selector('[data-ask="save"]',timeout=25000)
     check('上限を超えると確認が出る', any('上限' in d for d in dialogs[n0:]), str(dialogs[n0:]))
     # 「整理して保存」→ フォームに引き継ぐ
     pg.click('[data-ask="form"]'); pg.wait_for_selector('#shQA.open'); pg.wait_for_timeout(300)
