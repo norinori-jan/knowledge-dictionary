@@ -1,0 +1,6 @@
+{"exportedAt":1760000000000,"items":[
+ {"id":"a1","type":"ai_qa","title":"OAuthとは","tags":["AI Q&A","認証","OAuth"],"qa":{"question":"OAuthとは何ですか？","answer":"認可の仕組みです。アクセストークンを使います。","judgment":"JWTと併用する","summary":"認可の標準","sourceType":"claude","sourceUrl":"https://example.com/c/1"},"createdAt":1759000000000,"updatedAt":1759000000000},
+ {"id":"a2","type":"ai_qa","title":"OAuthとは","tags":["AI Q&A","API"],"qa":{"question":"OAuthのフローは？","answer":"認可コードフローが一般的。","judgment":"","summary":"","sourceType":"chatgpt","sourceUrl":""},"createdAt":1759100000000,"updatedAt":1759100000000},
+ {"id":"m1","title":"普通のメモ","tags":["x"],"body":"本文"},
+ {"id":"s1","type":"ai_qa","title":"秘密","sensitive":true,"qa":{"question":"q","answer":"a"}}
+],"attachments":[]}

@@ -1,0 +1,26 @@
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Playwright を入れる
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: 全テスト（AIや本物のサーバーには接続しません。通信は疑似に置き換えています）
+        run: bash tests/run_all.sh
+      - name: 失敗したときの画面写真
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots
+          path: /tmp/kd-out
