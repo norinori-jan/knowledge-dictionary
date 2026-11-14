@@ -1439,10 +1439,70 @@ function engPromptLong(e, n) {   // ENG-LONG：Speak Native の「聞き取り�
     '\nWrite a natural conversation between two people (speaker 0 and speaker 1), exactly ' + n + ' lines, alternating speakers, starting with speaker 0. Each line is 1-2 short sentences of natural spoken American English. Include concrete details (a time, place, number, reason, or choice). The conversation should explain or discuss the topic the way real people would, with questions and reactions.' +
     '\nReturn ONLY compact JSON, no markdown, no extra words:\n{"title":"short English title","scene_jp":"場面を日本語で1文","names":["name of speaker 0","name of speaker 1"],"genders":["f","m"],"lines":[{"sp":0,"en":"...","jp":"自然な日本語訳"}]}\n"genders" values are "f" or "m".';
 }
+/* ENG-FULL：役割・やり方・むずかしさ・続け方を選んで、Gemini Live などに最初に入れる文を作る */
+const ENG_ROLES = {
+  friend: { jp: '友だち', you: 'my friendly American friend', a: 'Mia', b: 'Ken', cast: 'two American friends chatting casually', open: 'Open with ONE natural question that a friend would ask about the topic.', fix: false },
+  coworker: { jp: '同僚', you: 'my American coworker. We talk at the office: polite but relaxed', a: 'Sarah', b: 'Tom', cast: 'two American coworkers talking at the office', open: 'Open with ONE natural question that a coworker would ask about the topic.', fix: false },
+  teacher: { jp: '英語の先生', you: 'my English teacher and conversation coach. You explain things simply and encourage me', a: 'Teacher', b: 'Student', cast: 'an English teacher and a student', open: 'Introduce the topic in 1-2 simple sentences, then ask me ONE question to check my idea.', fix: true },
+  expert: { jp: '詳しい人（教えてくれる）', you: 'a friendly expert on the topic. I am a curious beginner. You explain in simple everyday English', a: 'Expert', b: 'Learner', cast: 'a friendly expert and a curious beginner', open: 'Introduce the topic in 2 short sentences, then ask me what I want to know.', fix: false },
+  interviewer: { jp: '取材する人（こちらが答える）', you: 'a curious interviewer. You ask me questions about the topic and I answer in my own words', a: 'Interviewer', b: 'Guest', cast: 'an interviewer and a guest', open: 'Ask me ONE interview question about the topic.', fix: false }
+};
+const ENG_LV = { easy: 'CEFR A2: very simple common words, short sentences, slow-paced', normal: 'CEFR B1: everyday spoken English, some phrasal verbs', hard: 'CEFR B2: fast casual speech, idioms, contractions' };
+function engOptsLoad() { let o = {}; try { o = JSON.parse(lsGet('kd_eng_opts') || '{}') || {}; } catch (_) {} return Object.assign({ role: 'friend', mode: 'talk', lv: 'normal', len: '10', cont: 'wait' }, o); }
+function engOptsRead() {
+  const o = engOptsLoad(), g = id => { const el = $(id); return el ? el.value : null; };
+  ['Role:role', 'Mode:mode', 'Lv:lv', 'Len:len', 'Cont:cont'].forEach(x => { const [k, f] = x.split(':'), v = g('eng' + k); if (v) o[f] = v; });
+  try { lsSet('kd_eng_opts', JSON.stringify(o)); } catch (_) {}
+  return o;
+}
+function engPromptFull(e) {
+  const o = engOptsRead(), R = ENG_ROLES[o.role] || ENG_ROLES.friend, LV = ENG_LV[o.lv] || ENG_LV.normal;
+  const c = (typeof conclusionOf === 'function') ? conclusionOf(e) : null;
+  const clip = (t, k) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, k);
+  const notes = [e.term, e.oneLine ? clip(e.oneLine, 120) : '', c && c.text ? clip(c.text, 200) : '', e.note ? clip(e.note, 200) : ''].filter(Boolean).join(' / ');
+  const L = [];
+  if (o.mode === 'listen') {
+    const n = ['10', '20', '30'].indexOf(String(o.len)) >= 0 ? o.len : '10';
+    L.push('ROLE: Today I only want to LISTEN. I will not speak. You play both people yourself: ' + R.cast + ' (' + R.a + ' and ' + R.b + ').');
+    L.push('I am a Japanese adult learning everyday English. Level: ' + LV + '.', '',
+      'Rules:',
+      '- Have a natural conversation about the topic below: about ' + n + ' short lines, 1-2 sentences each, alternating speakers, starting with ' + R.a + '.',
+      '- English only. Natural spoken American English. Include concrete details (a number, a reason, a choice). No Japanese, no lists, no headings, no explanations.',
+      '- Start right now.',
+      o.cont === 'keep'
+        ? '- When a conversation is done, say "Next one." and start a NEW conversation on the same topic with new details. Keep going until I say "stop".'
+        : '- When it is done, say "That is all." and stop. Wait for me.',
+      '- If I say "more", start a new conversation on the same topic. If I say "again", repeat it more slowly. If I say "JP", give a Japanese translation. If I say "stop", stop.');
+  } else {
+    L.push('ROLE: You are ' + R.you + '. I am myself: a Japanese adult learning everyday English. Level: ' + LV + '.', '',
+      'Rules:',
+      '- Speak ONLY natural, everyday American English, like a real person talking. Short spoken lines: 1-2 sentences. No Japanese, no lists, no headings.',
+      '- Start right now. ' + R.open + ' Then stop and wait for my answer.',
+      '- After my answer, react or answer naturally, then ask one short follow-up question. ' + (o.cont === 'keep' ? 'Keep the conversation going until I say "stop".' : 'After about 6 turns, wrap up in one sentence and wait for me.'),
+      R.fix ? '- After each of my answers, give a one-line correction or a better phrase first, then continue.' : '- Do not correct my English unless I type "fix".',
+      '- If I type "JP", give a Japanese translation of your last line. If I type "more", change the angle and go on. If I type "stop", stop.');
+  }
+  L.push('', 'Topic (my notes are in Japanese, for your reference only. Do not translate them back):', notes, '', 'Begin now.');
+  return L.join('\n');
+}
+function engPanelHtml() {
+  const o = engOptsLoad();
+  const sel = (id, cur, items) => '<select id="' + id + '" style="font:inherit;padding:6px;border-radius:8px;width:100%;margin-top:2px">' + items.map(([v, t]) => '<option value="' + v + '"' + (String(cur) === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>';
+  const lab = t => '<div class="note" style="margin-top:8px"><b>' + t + '</b></div>';
+  return '<div class="card" style="margin:8px 0"><div class="note">選んでから、下のボタンを押します。貼って送ると、AI が決めた役割で、すぐ英語で始めます。そのあと、AI アプリの音声（Gemini Live など）に切り替えると、声で聞けます。API は使いません。</div>' +
+    lab('① 相手の役割') + sel('engRole', o.role, Object.keys(ENG_ROLES).map(k => [k, ENG_ROLES[k].jp])) +
+    lab('② やり方') + sel('engMode', o.mode, [['talk', '🗣 話す（会話する）'], ['listen', '🎧 聞くだけ（電車用）']]) +
+    lab('③ むずかしさ') + sel('engLv', o.lv, [['easy', 'やさしい'], ['normal', 'ふつう'], ['hard', 'むずかしい']]) +
+    lab('④ 聞くだけの長さ') + sel('engLen', o.len, [['10', '約1分（10行）'], ['20', '約2分（20行）'], ['30', '約3分（30行）']]) +
+    lab('⑤ 終わったあと') + sel('engCont', o.cont, [['wait', 'そこで止まる（「more」で続き）'], ['keep', 'そのまま続ける（「stop」で止める）']]) +
+    '<div class="row" style="margin-top:12px"><button class="btn pri" data-engdo="go-gemini" style="flex:1">Gemini で始める</button><button class="btn pri" data-engdo="go-claude" style="flex:1">Claude で始める</button></div></div>';
+}
 function engOpen(kind) {
   const e = entryById.get(viewId); if (!e) return;
-  const p = kind.indexOf('listen-') === 0 ? engPromptListen(e) : kind.indexOf('ph-') === 0 ? engPromptPhrases(e) : kind.indexOf('lg-') === 0 ? engPromptLong(e, +(($('engLen') || {}).value) || 20) : engPrompt(e);
+  const p = kind.indexOf('go-') === 0 ? engPromptFull(e) : kind.indexOf('listen-') === 0 ? engPromptListen(e) : kind.indexOf('ph-') === 0 ? engPromptPhrases(e) : kind.indexOf('lg-') === 0 ? engPromptLong(e, +(($('engLen') || {}).value) || 20) : engPrompt(e);
   if (findSecrets(p).length || ENG_SECRET_RX.test(p)) { alert('パスワードなど、秘密らしい内容が含まれています。\nAI には送りません。'); return; }
+  if (kind === 'go-claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます（文はコピー済みです）'); return; }
+  if (kind === 'go-gemini') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://gemini.google.com/app', '_blank'); toast('Gemini を開きます。貼り付けて送ってください（コピー済み）'); return; }
   if (kind === 'lg-claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます。返事をコピーして、「② Speak Native に貼る」へ'); }
   else if (kind === 'lg-gemini') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://gemini.google.com/app', '_blank'); toast('Gemini を開きます。貼り付けて送り、返事をコピーして、「② Speak Native に貼る」へ'); }
   else if (kind === 'lg-sn') { window.open('https://norinori-jan.github.io/speak-native/#lq=paste', '_blank'); }
@@ -1459,9 +1519,7 @@ document.addEventListener('click', ev => {
   const b = ev.target.closest && ev.target.closest('[data-eng]');
   if (b) {
     const out = $('engOut'); if (!out) return;
-    out.innerHTML = '<div class="card" style="margin:8px 0"><div class="note">/*ENG-SIMPLE*/ 貼って送るだけで、AI がすぐ英語で話しかけてきます。そのまま、AI アプリの音声（Gemini Live など）に切り替えると、声で会話できます。API は使いません。</div>' +
-      '<div class="note" style="margin-top:8px"><b>🗣 話して聞く</b></div>' + '<div class="row" style="margin-top:6px"><button class="btn pri" data-engdo="gemini" style="flex:1">Gemini</button><button class="btn pri" data-engdo="claude" style="flex:1">Claude</button></div>' +
-      '<div class="note" style="margin-top:10px"><b>🎧 聞くだけ（電車用）</b>　AI が2人の会話を、英語だけで話します</div>' + '<div class="row" style="margin-top:6px"><button class="btn pri" data-engdo="listen-gemini" style="flex:1">Gemini</button><button class="btn pri" data-engdo="listen-claude" style="flex:1">Claude</button></div>' + '</div>';
+    out.innerHTML = engPanelHtml();
     return;
   }
   const d = ev.target.closest && ev.target.closest('[data-engdo]');
