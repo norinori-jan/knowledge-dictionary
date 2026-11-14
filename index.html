@@ -1405,11 +1405,32 @@ function engPrompt(e) {   // ENG-PROMPT-V2：貼って送るだけで、すぐ�
     'Begin now.'
   ].join('\n');
 }
+function engPromptListen(e) {   // ENG-LISTEN：電車用。しゃべらず、聞くだけ
+  const c = (typeof conclusionOf === 'function') ? conclusionOf(e) : null;
+  const clip = (t, n) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const notes = [e.term, e.oneLine ? clip(e.oneLine, 120) : '', c && c.text ? clip(c.text, 200) : '', e.note ? clip(e.note, 200) : ''].filter(Boolean).join(' / ');
+  return [
+    'I am a Japanese adult learning everyday English. I want a listening session. I will only listen. I will not speak.',
+    '',
+    'Rules:',
+    '- Play both people (Mia and Ken) yourself. Have a natural, relaxed everyday conversation about the topic below: about 10 short lines, 1-2 sentences each.',
+    '- English only. Natural spoken American English. Include a few concrete details (a number, a reason, a choice). No Japanese, no lists, no headings, no explanations.',
+    '- Start right now. When the conversation is done, say "That is all." and stop.',
+    '- If I say "again", repeat it more slowly. If I say "JP", give a Japanese translation.',
+    '',
+    'Topic (my notes are in Japanese, for your reference only. Do not translate them back):',
+    notes,
+    '',
+    'Begin now.'
+  ].join('\n');
+}
 function engOpen(kind) {
   const e = entryById.get(viewId); if (!e) return;
-  const p = engPrompt(e);
+  const p = kind.indexOf('listen-') === 0 ? engPromptListen(e) : engPrompt(e);
   if (findSecrets(p).length || ENG_SECRET_RX.test(p)) { alert('パスワードなど、秘密らしい内容が含まれています。\nAI には送りません。'); return; }
-  if (kind === 'claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます（文はコピー済みです）'); }
+  if (kind === 'listen-claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます（聞くだけ・文はコピー済みです）'); }
+  else if (kind === 'listen-gemini') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://gemini.google.com/app', '_blank'); toast('Gemini を開きます。貼り付けてください（聞くだけ・コピー済み）'); }
+  else if (kind === 'claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます（文はコピー済みです）'); }
   else if (kind === 'gemini') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://gemini.google.com/app', '_blank'); toast('Gemini を開きます。貼り付けてください（コピー済み）'); }
   else if (kind === 'sn-claude' || kind === 'sn-gemini') { window.open('https://norinori-jan.github.io/speak-native/#ask=' + encodeURIComponent(p) + '&ai=' + (kind === 'sn-claude' ? 'claude' : 'gemini'), '_blank'); }
 }
@@ -1420,6 +1441,8 @@ document.addEventListener('click', ev => {
     out.innerHTML = '<div class="card" style="margin:8px 0"><div class="note">貼って送るだけで、AI がすぐ英語で話しかけてきます。上の2つは、いつものアプリで開くので API は使いません。下の2つは Speak Native で話します（API を使います）。</div>' +
       '<button class="btn wide" data-engdo="claude" style="margin-top:6px">Claude のアプリで開く</button>' +
       '<button class="btn wide" data-engdo="gemini" style="margin-top:6px">Gemini のアプリで開く</button>' +
+      '<button class="btn wide" data-engdo="listen-gemini" style="margin-top:6px">🎧 聞くだけ（電車用）Gemini のアプリで開く</button>' +
+      '<button class="btn wide" data-engdo="listen-claude" style="margin-top:6px">🎧 聞くだけ（電車用）Claude のアプリで開く</button>' +
       '<button class="btn wide" data-engdo="sn-claude" style="margin-top:6px">Speak Native で話す（Claude）</button>' +
       '<button class="btn wide" data-engdo="sn-gemini" style="margin-top:6px">Speak Native で話す（Gemini）</button></div>';
     return;
