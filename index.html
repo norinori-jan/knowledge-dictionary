@@ -1386,19 +1386,24 @@ async function quickSave() {
 
 /* ───────── 🗣 英会話で聞く：この項目を、日常英語の会話で聞く ───────── */
 const ENG_SECRET_RX = /(パスワード|password|passwd|暗証|秘密鍵|private key|token|トークン|合言葉|あいことば|api[_ -]?key|secret)/i;
-function engPrompt(e) {
+function engPrompt(e) {   // ENG-PROMPT-V2：貼って送るだけで、すぐ英語で話しかけてくる文
   const c = (typeof conclusionOf === 'function') ? conclusionOf(e) : null;
   const clip = (t, n) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, n);
-  const lines = ['英会話の練習をしたいです。次の話題について、日常英語で会話してください。', '', '話題：' + e.term];
-  if (e.oneLine) lines.push('一言で：' + clip(e.oneLine, 120));
-  if (c && c.text) lines.push('分かったこと：' + clip(c.text, 200));
-  if (e.note) lines.push('自分の理解：' + clip(e.note, 200));
-  lines.push('', 'お願い：',
-    '1. まず、この話題を native が日常で聞くときの英語の質問文を3つ、やさしい順に見せてください（日本語訳つき）。',
-    '2. そのうち1つを、あなたが私に聞いてください。私が英語で答えます。',
-    '3. そのあと、あなたの答えも、やさしく短い英語で聞かせてください。',
-    '4. 私の英語の間違いは、会話のあとにまとめて直してください。');
-  return lines.join('\n');
+  const notes = [e.term, e.oneLine ? clip(e.oneLine, 120) : '', c && c.text ? clip(c.text, 200) : '', e.note ? clip(e.note, 200) : ''].filter(Boolean).join(' / ');
+  return [
+    'You are my friendly English conversation partner. I am a Japanese adult learning everyday English.',
+    '',
+    'Rules:',
+    '- Speak ONLY natural, everyday American English, like a real person talking. Short spoken lines: 1-2 sentences. No Japanese, no lists, no headings, no explanations.',
+    '- Start right now. Open with ONE natural question that a native speaker would ask about the topic below. Then stop and wait for my answer.',
+    '- After my answer, react or answer naturally, then ask one short follow-up question. Keep the conversation going.',
+    '- If I type "JP", give a Japanese translation of your last line. If I type "fix", briefly correct my English.',
+    '',
+    'Topic (my notes are in Japanese, for your reference only. Do not translate them back):',
+    notes,
+    '',
+    'Begin now.'
+  ].join('\n');
 }
 function engOpen(kind) {
   const e = entryById.get(viewId); if (!e) return;
@@ -1412,7 +1417,7 @@ document.addEventListener('click', ev => {
   const b = ev.target.closest && ev.target.closest('[data-eng]');
   if (b) {
     const out = $('engOut'); if (!out) return;
-    out.innerHTML = '<div class="card" style="margin:8px 0"><div class="note">どちらで聞きますか。上の2つは、いつものアプリで開くので API は使いません。下の2つは Speak Native で話します（API を使います）。</div>' +
+    out.innerHTML = '<div class="card" style="margin:8px 0"><div class="note">貼って送るだけで、AI がすぐ英語で話しかけてきます。上の2つは、いつものアプリで開くので API は使いません。下の2つは Speak Native で話します（API を使います）。</div>' +
       '<button class="btn wide" data-engdo="claude" style="margin-top:6px">Claude のアプリで開く</button>' +
       '<button class="btn wide" data-engdo="gemini" style="margin-top:6px">Gemini のアプリで開く</button>' +
       '<button class="btn wide" data-engdo="sn-claude" style="margin-top:6px">Speak Native で話す（Claude）</button>' +
