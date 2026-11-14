@@ -1430,11 +1430,23 @@ function engPromptPhrases(e) {   // ENG-PHRASES：Speak Native の「聞き取�
   const notes = [e.oneLine ? clip(e.oneLine, 120) : '', c && c.text ? clip(c.text, 200) : '', e.note ? clip(e.note, 200) : ''].filter(Boolean).join(' / ');
   return '10個の、英語の聞き取り練習用フレーズを作ってください。\n場面：' + e.term + '\n条件：\n- この話題について、日常で自然に交わされるアメリカ英語。1〜2文。\n- 数字・理由・選択など、具体的な内容を含める。\n- 日本語のメモは参考用。訳し戻さないこと。' + (notes ? '\n  メモ：' + notes : '') + '\n出力はJSON配列だけ。前置き・説明・コードブロック記号は不要。形式：\n[{"en":"英文","jp":"日本語訳","say":[{"en":"返事の例","jp":"返事の訳"}],"note":"ひとこと解説（なくてもよい）"}]';
 }
+function engPromptLong(e, n) {   // ENG-LONG：Speak Native の「聞き取りテスト」に貼れる、長い会話
+  const c = (typeof conclusionOf === 'function') ? conclusionOf(e) : null;
+  const clip = (t, k) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, k);
+  const notes = [e.oneLine ? clip(e.oneLine, 120) : '', c && c.text ? clip(c.text, 200) : '', e.note ? clip(e.note, 200) : ''].filter(Boolean).join(' / ');
+  n = [10, 20, 30].indexOf(n) >= 0 ? n : 20;
+  return 'You write long listening-practice dialogues for a Japanese learner of English.\nTopic: ' + e.term + (notes ? '\n(My notes are in Japanese, for reference only. Do not translate them back: ' + notes + ')' : '') +
+    '\nWrite a natural conversation between two people (speaker 0 and speaker 1), exactly ' + n + ' lines, alternating speakers, starting with speaker 0. Each line is 1-2 short sentences of natural spoken American English. Include concrete details (a time, place, number, reason, or choice). The conversation should explain or discuss the topic the way real people would, with questions and reactions.' +
+    '\nReturn ONLY compact JSON, no markdown, no extra words:\n{"title":"short English title","scene_jp":"場面を日本語で1文","names":["name of speaker 0","name of speaker 1"],"genders":["f","m"],"lines":[{"sp":0,"en":"...","jp":"自然な日本語訳"}]}\n"genders" values are "f" or "m".';
+}
 function engOpen(kind) {
   const e = entryById.get(viewId); if (!e) return;
-  const p = kind.indexOf('listen-') === 0 ? engPromptListen(e) : kind.indexOf('ph-') === 0 ? engPromptPhrases(e) : engPrompt(e);
+  const p = kind.indexOf('listen-') === 0 ? engPromptListen(e) : kind.indexOf('ph-') === 0 ? engPromptPhrases(e) : kind.indexOf('lg-') === 0 ? engPromptLong(e, +(($('engLen') || {}).value) || 20) : engPrompt(e);
   if (findSecrets(p).length || ENG_SECRET_RX.test(p)) { alert('パスワードなど、秘密らしい内容が含まれています。\nAI には送りません。'); return; }
-  if (kind === 'ph-claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます。返事をコピーして、「② Speak Native に貼る」へ'); }
+  if (kind === 'lg-claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます。返事をコピーして、「② Speak Native に貼る」へ'); }
+  else if (kind === 'lg-gemini') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://gemini.google.com/app', '_blank'); toast('Gemini を開きます。貼り付けて送り、返事をコピーして、「② Speak Native に貼る」へ'); }
+  else if (kind === 'lg-sn') { window.open('https://norinori-jan.github.io/speak-native/#lq=paste', '_blank'); }
+  else if (kind === 'ph-claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます。返事をコピーして、「② Speak Native に貼る」へ'); }
   else if (kind === 'ph-gemini') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://gemini.google.com/app', '_blank'); toast('Gemini を開きます。貼り付けて送り、返事をコピーして、「② Speak Native に貼る」へ'); }
   else if (kind === 'ph-sn') { window.open('https://norinori-jan.github.io/speak-native/#ph=ai&theme=' + encodeURIComponent(String(e.term).slice(0, 40)), '_blank'); }
   else if (kind === 'listen-claude') { try { navigator.clipboard.writeText(p).catch(() => {}); } catch (_) {} window.open('https://claude.ai/new?q=' + encodeURIComponent(p), '_blank'); toast('Claude を開きます（聞くだけ・文はコピー済みです）'); }
@@ -1452,6 +1464,9 @@ document.addEventListener('click', ev => {
       '<div class="note" style="margin-top:8px"><b>🎧 聞くだけ（電車用）</b>（AI の声・API 不使用）</div>' + '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="listen-gemini" style="flex:1">Gemini</button><button class="btn" data-engdo="listen-claude" style="flex:1">Claude</button></div>' +
       '<div class="note" style="margin-top:8px"><b>📻 声はアプリで</b>（Speak Native が読み上げ。電車でも使える）<br>① AI に作らせる　② 返事をコピーして Speak Native に貼る</div>' + '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="ph-gemini" style="flex:1">① Gemini で作る</button><button class="btn" data-engdo="ph-claude" style="flex:1">① Claude で作る</button></div>' +
       '<button class="btn wide pri" data-engdo="ph-sn" style="margin-top:6px">② Speak Native に貼る</button>' +
+      '<div class="note" style="margin-top:8px"><b>📚 長い会話を、声で聞く</b>（Speak Native が2人の声で読み上げ。API 不使用。電車でも使える）<br>長さ：<select id="engLen" style="font:inherit;padding:4px"><option value="10">約1分（10行）</option><option value="20" selected>約2分（20行）</option><option value="30">約3分（30行）</option></select><br>① AI に作らせる　② 返事をコピーして Speak Native に貼る</div>' +
+      '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="lg-gemini" style="flex:1">① Gemini で作る</button><button class="btn" data-engdo="lg-claude" style="flex:1">① Claude で作る</button></div>' +
+      '<button class="btn wide pri" data-engdo="lg-sn" style="margin-top:6px">② Speak Native に貼る</button>' +
       '<div class="note" style="margin-top:8px"><b>Speak Native で話す</b>（API を使います）</div>' + '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="sn-claude" style="flex:1">Claude</button><button class="btn" data-engdo="sn-gemini" style="flex:1">Gemini</button></div>' + '</div>';
     return;
   }
