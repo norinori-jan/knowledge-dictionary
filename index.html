@@ -163,6 +163,10 @@ ul.op{margin:4px 0 0;padding-left:20px;font-size:14px}
       <input type="search" id="q" placeholder="何が分からない？ キーワードを入れる（空白で絞り込み）" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <button class="clr" id="btnClear" aria-label="消す">✕</button>
     </div>
+    <div class="quick" id="quickBox" style="margin-top:8px;display:flex;gap:8px;align-items:flex-end">
+      <textarea id="quickText" rows="2" placeholder="ここに書く（メモでも、AIの回答でも、そのまま）" style="flex:1;min-width:0;padding:10px;border-radius:10px;border:1px solid var(--line,#ccc);font:inherit;resize:vertical"></textarea>
+      <button class="btn pri" id="btnQuick">保存</button>
+    </div>
     <div class="chips" id="fchips">
       <button class="fchip on" data-f="all">すべて</button>
       <button class="fchip" data-f="unknown">未理解</button>
@@ -1359,6 +1363,26 @@ function qrSectionHtml(toks) {
     (qrHidden ? '<div class="note" style="margin:6px 4px">保護メモと、秘密らしいメモ ' + qrHidden + '件は、ここには出しません。</div>' : '');
 }
 
+/* ───────── 書く入口を1つに：ここに書けば、あとは探すだけ ───────── */
+const QUICK_SECRET_RX = /(パスワード|password|passwd|暗証|秘密鍵|private key|token|トークン|合言葉|あいことば|api[_ -]?key|secret)/i;
+async function quickSave() {
+  const ta = $('quickText'), text = ta.value.trim();
+  if (!text) { toast('書いてください'); return; }
+  if (findSecrets(text).length || QUICK_SECRET_RX.test(text)) {
+    alert('パスワードなど、秘密らしい内容です。\nここには保存しません。KAGI に保存してください。');
+    return;
+  }
+  const now = Date.now(), term = firstLine(text).slice(0, 40) || '（無題）';
+  let e = findEntryByTerm(term);
+  const stamp = new Date(now).toLocaleDateString('ja-JP');
+  if (e) e = Object.assign({}, e, { note: (e.note ? e.note + '\n\n' : '') + '（' + stamp + '）' + text, updatedAt: now });
+  else e = { id: uid(), term, kind: 'term', oneLine: '', tags: [], related: [], note: text, understanding: 'unknown', checkedAt: null, createdAt: now, updatedAt: now };
+  await writeEntries([e]);
+  ta.value = '';
+  refresh();
+  toast('保存しました');
+}
+
 /* ───────── 設定 ───────── */
 async function renderSettings() {
   const last = Number(lsGet('kd_last_backup')) || 0;
@@ -1565,6 +1589,7 @@ function openGraph(center) { grCenter = center || null; drawGraph(); openSheet('
 /* ───────── 配線 ───────── */
 function wire() {
   $('q').addEventListener('input', e => { searchQuery = e.target.value; renderList(); if (Date.now() - qrLoadedAt > 300000) void loadQRNotes(); });
+  $('btnQuick').addEventListener('click', () => { void quickSave(); });
   $('btnClear').addEventListener('click', () => { $('q').value = ''; searchQuery = ''; renderList(); $('q').focus(); });
   $('fchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filterUnd = b.dataset.f; document.querySelectorAll('#fchips .fchip').forEach(x => x.classList.toggle('on', x === b)); renderList(); });
   document.querySelectorAll('#vchips .fchip').forEach(x => x.classList.toggle('on', x.dataset.v === listView));
