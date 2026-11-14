@@ -1416,7 +1416,7 @@ function engPromptListen(e) {   // ENG-LISTEN：電車用。しゃべらず、�
     '- Play both people (Mia and Ken) yourself. Have a natural, relaxed everyday conversation about the topic below: about 10 short lines, 1-2 sentences each.',
     '- English only. Natural spoken American English. Include a few concrete details (a number, a reason, a choice). No Japanese, no lists, no headings, no explanations.',
     '- Start right now. When the conversation is done, say "That is all." and stop.',
-    '- If I say "again", repeat it more slowly. If I say "JP", give a Japanese translation.',
+    '- If I say "again", repeat it more slowly. If I say "more", continue with a new conversation on the same topic. If I say "JP", give a Japanese translation.',
     '',
     'Topic (my notes are in Japanese, for your reference only. Do not translate them back):',
     notes,
@@ -1459,15 +1459,9 @@ document.addEventListener('click', ev => {
   const b = ev.target.closest && ev.target.closest('[data-eng]');
   if (b) {
     const out = $('engOut'); if (!out) return;
-    out.innerHTML = '<div class="card" style="margin:8px 0"><div class="note">貼って送るだけで、AI がすぐ英語で話しかけてきます。声は、AI アプリの音声モードか読み上げで聞きます。</div>' +
-      '<div class="note" style="margin-top:8px"><b>話して聞く</b>（AI の声・API 不使用）</div>' + '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="gemini" style="flex:1">Gemini</button><button class="btn" data-engdo="claude" style="flex:1">Claude</button></div>' +
-      '<div class="note" style="margin-top:8px"><b>🎧 聞くだけ（電車用）</b>（AI の声・API 不使用）</div>' + '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="listen-gemini" style="flex:1">Gemini</button><button class="btn" data-engdo="listen-claude" style="flex:1">Claude</button></div>' +
-      '<div class="note" style="margin-top:8px"><b>📻 声はアプリで</b>（Speak Native が読み上げ。電車でも使える）<br>① AI に作らせる　② 返事をコピーして Speak Native に貼る</div>' + '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="ph-gemini" style="flex:1">① Gemini で作る</button><button class="btn" data-engdo="ph-claude" style="flex:1">① Claude で作る</button></div>' +
-      '<button class="btn wide pri" data-engdo="ph-sn" style="margin-top:6px">② Speak Native に貼る</button>' +
-      '<div class="note" style="margin-top:8px"><b>📚 長い会話を、声で聞く</b>（Speak Native が2人の声で読み上げ。API 不使用。電車でも使える）<br>長さ：<select id="engLen" style="font:inherit;padding:4px"><option value="10">約1分（10行）</option><option value="20" selected>約2分（20行）</option><option value="30">約3分（30行）</option></select><br>① AI に作らせる　② 返事をコピーして Speak Native に貼る</div>' +
-      '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="lg-gemini" style="flex:1">① Gemini で作る</button><button class="btn" data-engdo="lg-claude" style="flex:1">① Claude で作る</button></div>' +
-      '<button class="btn wide pri" data-engdo="lg-sn" style="margin-top:6px">② Speak Native に貼る</button>' +
-      '<div class="note" style="margin-top:8px"><b>Speak Native で話す</b>（API を使います）</div>' + '<div class="row" style="margin-top:6px"><button class="btn" data-engdo="sn-claude" style="flex:1">Claude</button><button class="btn" data-engdo="sn-gemini" style="flex:1">Gemini</button></div>' + '</div>';
+    out.innerHTML = '<div class="card" style="margin:8px 0"><div class="note">/*ENG-SIMPLE*/ 貼って送るだけで、AI がすぐ英語で話しかけてきます。そのまま、AI アプリの音声（Gemini Live など）に切り替えると、声で会話できます。API は使いません。</div>' +
+      '<div class="note" style="margin-top:8px"><b>🗣 話して聞く</b></div>' + '<div class="row" style="margin-top:6px"><button class="btn pri" data-engdo="gemini" style="flex:1">Gemini</button><button class="btn pri" data-engdo="claude" style="flex:1">Claude</button></div>' +
+      '<div class="note" style="margin-top:10px"><b>🎧 聞くだけ（電車用）</b>　AI が2人の会話を、英語だけで話します</div>' + '<div class="row" style="margin-top:6px"><button class="btn pri" data-engdo="listen-gemini" style="flex:1">Gemini</button><button class="btn pri" data-engdo="listen-claude" style="flex:1">Claude</button></div>' + '</div>';
     return;
   }
   const d = ev.target.closest && ev.target.closest('[data-engdo]');
