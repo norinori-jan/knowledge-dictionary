@@ -1466,7 +1466,11 @@ function engPromptFull(e) {
     L.push('ROLE: Today I only want to LISTEN. I will not speak. You play both people yourself: ' + R.cast + ' (' + R.a + ' and ' + R.b + ').');
     L.push('I am a Japanese adult learning everyday English. Level: ' + LV + '.', '',
       'Rules:',
-      '- Have a natural conversation about the topic below: about ' + n + ' short lines, 1-2 sentences each, alternating speakers, starting with ' + R.a + '.',
+      /* ENG-CALM：早口・ラップ調にならない、ゆっくり落ち着いた読み方 */
+      '- DELIVERY IS THE MOST IMPORTANT RULE: speak slowly and calmly, like a patient audiobook narrator or a relaxed podcast. Never rush. Never rap, never sing, never use a rhythmic or sing-song beat. Plain, natural intonation only.',
+      '- Say each line as a full, normal sentence. Pause for about two seconds between lines. Do not speed up as you go.',
+      '- Use a slightly lower, softer voice for ' + R.b + ' and a slightly brighter voice for ' + R.a + ', so I can tell them apart. Do not say the names out loud.',
+      '- Have a natural conversation about the topic below: about ' + n + ' lines, one or two complete sentences each, alternating speakers, starting with ' + R.a + '.',
       '- English only. Natural spoken American English. Include concrete details (a number, a reason, a choice). No Japanese, no lists, no headings, no explanations.',
       '- Start right now.',
       o.cont === 'keep'
