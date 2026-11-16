@@ -1470,7 +1470,11 @@ function engPromptFull(e) {
       '- DELIVERY IS THE MOST IMPORTANT RULE: speak slowly and calmly, like a patient audiobook narrator or a relaxed podcast. Never rush. Never rap, never sing, never use a rhythmic or sing-song beat. Plain, natural intonation only.',
       '- Say each line as a full, normal sentence. Pause for about two seconds between lines. Do not speed up as you go.',
       '- Use a slightly lower, softer voice for ' + R.b + ' and a slightly brighter voice for ' + R.a + ', so I can tell them apart. Do not say the names out loud.',
-      '- Have a natural conversation about the topic below: about ' + n + ' lines, one or two complete sentences each, alternating speakers, starting with ' + R.a + '.',
+      /* ENG-PACKFMT：Speak Native の会話集と同じ構成（題名→8〜10行→音のポイント） */
+      '- FORMAT (same as my conversation book): First say one short title like "Conversation one: A Wrong Number." Then the conversation: ' + (n === '10' ? '8 to 10' : n) + ' lines, ' + R.a + ' first, strictly alternating, one or two complete sentences each, a real two-person scene with a small problem and a clear ending.',
+      '- Use real spoken forms that learners miss: gonna, wanna, gotta, let me, give me, kind of, a lot of, did you, would you, could you. Say them the way a native speaker really does.',
+      '- After the last line, say "Sound points." and name ONE or TWO of those phrases in this form only: "going to sounds like gonna." Then stop.',
+      '- ALSO write the same conversation as text in my chat, in this exact format, one line per sentence, no extra words: [{"sp":0,"en":"...","jp":"Japanese translation"},{"sp":1,"en":"...","jp":"..."}] and add "note":"元の形: going to／聞こえ方: ガナ／使う場面:これからの予定を言う時" on the line with a sound point.',
       '- English only. Natural spoken American English. Include concrete details (a number, a reason, a choice). No Japanese, no lists, no headings, no explanations.',
       '- Start right now.',
       o.cont === 'keep'
